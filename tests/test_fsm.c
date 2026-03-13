@@ -1,8 +1,17 @@
 /**
  * @file test_fsm.c
- * @brief FSM框架测试代码 - 使用二维数组版本
+ * @brief FSM框架测试代码 - 使用二维数组版本（无超时）
  */
+//===========================================================//
+//= Include files.                                          =//
+//===========================================================//
+#include "fsm.h"
+#include <stdio.h>
+#include <stdbool.h>
 
+//===========================================================//
+//= Marco definition.                                       =//
+//===========================================================//
 /* 测试程序独立定义自己的日志宏，与框架解耦 */
 #ifndef TEST_PRINTF
     #define TEST_PRINTF printf
@@ -15,10 +24,6 @@
 #define TEST_LOG_ERR(fmt, ...) \
     TEST_PRINTF("[TEST_ERR] " fmt "\r\n", ##__VA_ARGS__)
 
-#include "fsm.h"
-#include <stdio.h>
-#include <stdbool.h>
-
 #ifdef _WIN32
 #include <windows.h>
 #define CLEAR_SCREEN() system("cls")
@@ -26,9 +31,9 @@
 #define CLEAR_SCREEN() system("clear")
 #endif
 
-/*============================================================================*
- *                                状态与事件定义                               *
- *============================================================================*/
+//===========================================================//
+//= Data type declare.                                      =//
+//===========================================================//
 typedef enum
 {
     STATE_IDLE = 0,
@@ -173,11 +178,11 @@ FSM_PRIVATE void action_error_occurred(fsm_context_t* context, void* event_data)
  *============================================================================*/
 static const fsm_state_t test_states[] =
 {
-    /* id,        name,       handler,           on_enter, on_exit, timeout_ms, timeout_next */
-    {STATE_IDLE,   "IDLE",    state_idle_handler, NULL,    NULL,    0,          0},
-    {STATE_ACTIVE, "ACTIVE",  state_active_handler, on_enter_active, on_exit_active, 5000, STATE_IDLE},
-    {STATE_PAUSED, "PAUSED",  NULL,               NULL,    NULL,    0,          0},
-    {STATE_ERROR,  "ERROR",   NULL,               on_enter_error, NULL, 0,      0},
+    /* id,        name,       handler,           on_enter, on_exit */
+    {STATE_IDLE,   "IDLE",    state_idle_handler, NULL,    NULL},
+    {STATE_ACTIVE, "ACTIVE",  state_active_handler, on_enter_active, on_exit_active},
+    {STATE_PAUSED, "PAUSED",  NULL,               NULL,    NULL},
+    {STATE_ERROR,  "ERROR",   NULL,               on_enter_error, NULL},
 };
 
 /*============================================================================*
@@ -364,58 +369,7 @@ void test_guard_conditions(void)
     fsm_destroy(fsm);
 }
 
-void test_timeout_functionality(void)
-{
-    fsm_context_t context;
-    test_user_data_t user_data = {0};
-    fsm_config_t config = test_fsm_config;
-    fsm_handle_t fsm = NULL;
-    uint32_t current_time = 0;
-    int i = 0;
-    fsm_state_id_t state = 0;
-
-    TEST_LOG_INFO("=== Test Timeout Functionality ===");
-
-    config.user_data = &user_data;
-
-    fsm = fsm_create(&config, &context);
-    if (fsm == NULL)
-    {
-        TEST_LOG_ERR("Failed to create FSM");
-        return;
-    }
-
-    TEST_LOG_INFO("Starting in IDLE state");
-
-    /* 转移到ACTIVE状态（有5秒超时） */
-    fsm_process_event(fsm, EVENT_START, NULL);
-    TEST_LOG_INFO("Moved to ACTIVE state (will timeout to IDLE after 5 seconds)");
-
-    /* 模拟时间流逝 */
-    TEST_LOG_INFO("Simulating time...");
-    current_time = 0;
-
-    for (i = 0; i < 7; i++)
-    {
-        current_time += 1000; /* 增加1秒 */
-        fsm_check_timeout(fsm, current_time);
-
-        state = fsm_get_current_state(fsm);
-        TEST_PRINTF("  Time: %u ms, State: %u", current_time, state);
-
-        if (i == 4)
-        {
-            TEST_PRINTF(" (Should still be ACTIVE)");
-        }
-        else if (i == 5)
-        {
-            TEST_PRINTF(" (Should be IDLE due to timeout)");
-        }
-        TEST_PRINTF("\r\n");
-    }
-
-    fsm_destroy(fsm);
-}
+/* 超时测试函数已移除 */
 
 void test_error_handling(void)
 {
@@ -527,10 +481,6 @@ int main(void)
     getchar();
 
     test_guard_conditions();
-    TEST_PRINTF("\r\nPress Enter to continue to timeout tests...");
-    getchar();
-
-    test_timeout_functionality();
     TEST_PRINTF("\r\nPress Enter to continue to error handling tests...");
     getchar();
 
@@ -544,7 +494,8 @@ int main(void)
     set_console_color(FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 #endif
 
-    TEST_PRINTF("\r\n============================================\r\n");
+    TEST_PRINTF("\r\n");
+    TEST_PRINTF("============================================\r\n");
     TEST_PRINTF("          All Tests Completed!              \r\n");
     TEST_PRINTF("============================================\r\n");
 

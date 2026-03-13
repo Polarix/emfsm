@@ -1,6 +1,6 @@
 /**
- * @file simple_example.c
- * @brief FSM框架简单示例 - LED灯光控制器
+ * @file led_example.c
+ * @brief FSM框架简单示例 - LED灯光控制器（无超时）
  */
 
 /* 示例程序独立定义自己的日志宏，与框架解耦 */
@@ -299,10 +299,10 @@ static void action_log_light_change(fsm_context_t* context, void* event_data)
 /*================================================================*/
 static const fsm_state_t light_states[] =
 {
-    /* id,          name,        handler,              on_enter,     on_exit,  timeout_ms, timeout_next */
-    {LIGHT_OFF,     "OFF",       state_off_handler,    on_enter_off, NULL,     0,          0},
-    {LIGHT_ON,      "ON",        state_on_handler,     on_enter_on,  NULL,     0,          0},
-    {LIGHT_BLINKING,"BLINKING",  state_blinking_handler, on_enter_blinking, on_exit_blinking, 10000, LIGHT_OFF},
+    /* id,          name,        handler,              on_enter,     on_exit */
+    {LIGHT_OFF,     "OFF",       state_off_handler,    on_enter_off, NULL},
+    {LIGHT_ON,      "ON",        state_on_handler,     on_enter_on,  NULL},
+    {LIGHT_BLINKING,"BLINKING",  state_blinking_handler, on_enter_blinking, on_exit_blinking},
 };
 
 /*================================================================*/
@@ -462,8 +462,6 @@ void example_advanced_features(void)
         .name = "AdvancedLightController"
     };
     fsm_handle_t light_fsm = NULL;
-    uint32_t current_time = 0;
-    int i = 0;
     fsm_stats_t stats;
     const fsm_transition_item_t* item = NULL;
 
@@ -491,38 +489,10 @@ void example_advanced_features(void)
         DEMO_LOG_INFO("  Guard was rejected (expected)");
     }
 
-    /* 测试超时功能 */
-    DEMO_LOG_INFO("Test 2: Testing timeout feature");
-    user_data.blink_interval = 500;  /* 恢复有效值 */
-    fsm_process_event(light_fsm, EVENT_SET_BLINK, NULL);
-
-    DEMO_LOG_INFO("Now in BLINKING state (will timeout after 10 seconds)");
-    DEMO_LOG_INFO("Simulating 12 seconds passing...");
-
-    /* 模拟时间流逝，检查超时 */
-    current_time = 0;
-    for (i = 0; i < 13; i++)
-    {
-        current_time += 1000;  /* 增加1秒 */
-        fsm_check_timeout(light_fsm, current_time);
-
-        fsm_state_id_t state = fsm_get_current_state(light_fsm);
-        DEMO_PRINTF("  Time: %us, State: %s", i + 1,
-                    fsm_get_state_name(light_fsm, state));
-
-        if (i == 9)
-        {
-            DEMO_PRINTF(" (Should still be BLINKING)");
-        }
-        else if (i == 10)
-        {
-            DEMO_PRINTF(" (Should be OFF due to timeout)");
-        }
-        DEMO_PRINTF("\r\n");
-    }
+    /* 超时测试已移除 */
 
     /* 测试强制状态 */
-    DEMO_LOG_INFO("Test 3: Testing force state");
+    DEMO_LOG_INFO("Test 2: Testing force state");
     fsm_force_state(light_fsm, LIGHT_ON);
     DEMO_PRINTF("Forced state to ON. Current state: %s\r\n",
                 fsm_get_state_name(light_fsm, fsm_get_current_state(light_fsm)));
@@ -538,7 +508,7 @@ void example_advanced_features(void)
                 fsm_is_in_state(light_fsm, LIGHT_OFF) ? "Yes" : "No");
 
     /* 测试二维数组访问 */
-    DEMO_LOG_INFO("Test 4: Testing 2D array access");
+    DEMO_LOG_INFO("Test 3: Testing 2D array access");
     item = fsm_get_transition_item(&config, LIGHT_OFF, EVENT_TURN_ON);
     if ((item != NULL) && (item->next_state == LIGHT_ON))
     {

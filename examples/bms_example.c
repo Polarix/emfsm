@@ -1,6 +1,6 @@
 /**
  * @file bms_example.c
- * @brief BMS管理系统示例
+ * @brief BMS管理系统示例（无超时版本）
  */
 
 /* 独立的示例日志宏 */
@@ -67,7 +67,7 @@ typedef enum
     EVENT_TEMP_HIGH,        /* 温度过高 */
     EVENT_FAULT,            /* 故障发生 */
     EVENT_FAULT_CLEAR,      /* 故障清除 */
-    EVENT_SLEEP_TIMEOUT,    /* 休眠超时 */
+    EVENT_SLEEP_TIMEOUT,    /* 休眠超时（仍保留事件，需手动触发） */
     EVENT_WAKEUP,           /* 唤醒 */
     EVENT_DEEP_SLEEP_CMD,   /* 进入深度休眠命令 */
     BMS_EVENT_COUNT
@@ -153,17 +153,17 @@ static void action_ota_done(fsm_context_t* ctx, void* event_data);
 /*================================================================*/
 static const fsm_state_t bms_states[] =
 {
-    /* id,              name,           handler,                on_enter,           on_exit,            timeout_ms, timeout_next */
-    {STATE_UNINIT,      "UNINIT",       state_uninit_handler,   on_enter_uninit,    NULL,               0,          0},
-    {STATE_INIT,        "INIT",         state_init_handler,     on_enter_init,      on_exit_init,       5000,       STATE_ERROR},  /* 初始化超时5秒转错误 */
-    {STATE_OTA,         "OTA",          state_ota_handler,      on_enter_ota,       on_exit_ota,        60000,      STATE_ERROR},  /* OTA超时60秒转错误 */
-    {STATE_IDLE,        "IDLE",         state_idle_handler,     on_enter_idle,      on_exit_idle,       300000,     STATE_SLEEP},   /* 空闲5分钟转休眠 */
-    {STATE_CHARGING,    "CHARGING",     state_charging_handler, on_enter_charging,  on_exit_charging,   0,          0},
-    {STATE_DISCHARGING, "DISCHARGING",  state_discharging_handler, on_enter_discharging, on_exit_discharging, 0, 0},
-    {STATE_HEATING,     "HEATING",      state_heating_handler,  on_enter_heating,   on_exit_heating,    60000,      STATE_IDLE},    /* 加热最多1分钟，超时回IDLE */
-    {STATE_ERROR,       "ERROR",        state_error_handler,    on_enter_error,     on_exit_error,      0,          0},
-    {STATE_SLEEP,       "SLEEP",        state_sleep_handler,    on_enter_sleep,     on_exit_sleep,      3600000,    STATE_DEEP_SLEEP}, /* 休眠1小时转深度休眠 */
-    {STATE_DEEP_SLEEP,  "DEEP_SLEEP",   state_deep_sleep_handler, on_enter_deep_sleep, on_exit_deep_sleep, 0, 0},
+    /* id,              name,           handler,                on_enter,           on_exit */
+    {STATE_UNINIT,      "UNINIT",       state_uninit_handler,   on_enter_uninit,    NULL},
+    {STATE_INIT,        "INIT",         state_init_handler,     on_enter_init,      on_exit_init},
+    {STATE_OTA,         "OTA",          state_ota_handler,      on_enter_ota,       on_exit_ota},
+    {STATE_IDLE,        "IDLE",         state_idle_handler,     on_enter_idle,      on_exit_idle},
+    {STATE_CHARGING,    "CHARGING",     state_charging_handler, on_enter_charging,  on_exit_charging},
+    {STATE_DISCHARGING, "DISCHARGING",  state_discharging_handler, on_enter_discharging, on_exit_discharging},
+    {STATE_HEATING,     "HEATING",      state_heating_handler,  on_enter_heating,   on_exit_heating},
+    {STATE_ERROR,       "ERROR",        state_error_handler,    on_enter_error,     on_exit_error},
+    {STATE_SLEEP,       "SLEEP",        state_sleep_handler,    on_enter_sleep,     on_exit_sleep},
+    {STATE_DEEP_SLEEP,  "DEEP_SLEEP",   state_deep_sleep_handler, on_enter_deep_sleep, on_exit_deep_sleep},
 };
 
 /*================================================================*/
@@ -196,113 +196,113 @@ static const fsm_transition_item_t bms_transition_table[BMS_STATE_COUNT][BMS_EVE
     /* 状态 INIT (1) */
     [STATE_INIT] =
     {
-        /* EVENT_POWER_ON */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_IDLE,        FSM_GUARD_NOP,      action_log_transition}, /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_PLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_IDLE,        FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_OTA_START */       {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_DETACH */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_WAKEUP */          {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_INIT,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 
     /* 状态 OTA (2) */
     [STATE_OTA] =
     {
-        /* EVENT_POWER_ON */        {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_IDLE,        FSM_GUARD_NOP,      action_ota_done},  /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_PLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_IDLE,        FSM_GUARD_NOP,      action_ota_done},
+        /* EVENT_OTA_FAIL */        {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_CHARGE_PLUG */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_DETACH */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_WAKEUP */          {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_OTA,         FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 
     /* 状态 IDLE (3) */
     [STATE_IDLE] =
     {
-        /* EVENT_POWER_ON */        {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_OTA,         guard_can_ota,      action_ota_start},/* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    guard_can_charge,   action_start_charging}, /* CHARGE_PLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, guard_can_discharge, action_start_discharging}, /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_HEATING,     guard_can_heat,     action_start_heating}, /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_SLEEP,       guard_can_sleep,    action_enter_sleep}, /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_DEEP_SLEEP,  guard_can_deep_sleep, action_enter_deep_sleep}, /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_OTA,         guard_can_ota,      action_ota_start},
+        /* EVENT_OTA_DONE */        {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    guard_can_charge,   action_start_charging},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, guard_can_discharge, action_start_discharging},
+        /* EVENT_LOAD_DETACH */     {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_HEATING,     guard_can_heat,     action_start_heating},
+        /* EVENT_TEMP_NORMAL */     {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_SLEEP,       guard_can_sleep,    action_enter_sleep},
+        /* EVENT_WAKEUP */          {STATE_IDLE,        FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_DEEP_SLEEP,  guard_can_deep_sleep, action_enter_deep_sleep},
     },
 
     /* 状态 CHARGING (4) */
     [STATE_CHARGING] =
     {
-        /* EVENT_POWER_ON */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_PLUG */
+        /* EVENT_POWER_ON */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
                                     /* CHARGE_UNPLUG 由状态处理函数直接处理，故设为自循环 */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, guard_can_discharge, action_stop_charging}, /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_CHARGE_UNPLUG */   {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, guard_can_discharge, action_stop_charging},
+        /* EVENT_LOAD_DETACH */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_WAKEUP */          {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 
     /* 状态 DISCHARGING (5) */
     [STATE_DISCHARGING] =
     {
-        /* EVENT_POWER_ON */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    guard_can_charge,   action_stop_discharging}, /* CHARGE_PLUG */
-                                    {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_ATTACH */
-        /* EVENT_LOAD_ATTACH */     /* LOAD_DETACH 由状态处理函数直接处理，故设为自循环 */
-        /* EVENT_LOAD_DETACH */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    guard_can_charge,   action_stop_discharging},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+                                    /* LOAD_DETACH 由状态处理函数直接处理，故设为自循环 */
+        /* EVENT_LOAD_DETACH */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_WAKEUP */          {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 
     /* 状态 HEATING (6) */
@@ -330,67 +330,67 @@ static const fsm_transition_item_t bms_transition_table[BMS_STATE_COUNT][BMS_EVE
     /* 状态 ERROR (7) */
     [STATE_ERROR] =
     {
-        /* EVENT_POWER_ON */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_PLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_IDLE,        FSM_GUARD_NOP,      action_log_transition}, /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_DETACH */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_FAULT_CLEAR */     {STATE_IDLE,        FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_WAKEUP */          {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_ERROR,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 
     /* 状态 SLEEP (8) */
     [STATE_SLEEP] =
     {
-        /* EVENT_POWER_ON */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_PLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      action_enter_deep_sleep}, /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_IDLE,        FSM_GUARD_NOP,      action_log_transition}, /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_DETACH */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      action_enter_deep_sleep},
+        /* EVENT_WAKEUP */          {STATE_IDLE,        FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_SLEEP,       FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 
     /* 状态 DEEP_SLEEP (9) */
     [STATE_DEEP_SLEEP] =
     {
-        /* EVENT_POWER_ON */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* POWER_ON */
-        /* EVENT_INIT_DONE */       {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* INIT_DONE */
-        /* EVENT_OTA_START */       {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_START */
-        /* EVENT_OTA_DONE */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_DONE */
-        /* EVENT_OTA_FAIL */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* OTA_FAIL */
-        /* EVENT_CHARGE_PLUG */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_PLUG */
-        /* EVENT_CHARGE_UNPLUG */   {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* CHARGE_UNPLUG */
-        /* EVENT_LOAD_ATTACH */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_ATTACH */
-        /* EVENT_LOAD_DETACH */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* LOAD_DETACH */
-        /* EVENT_TEMP_LOW */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_LOW */
-        /* EVENT_TEMP_NORMAL */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_NORMAL */
-        /* EVENT_TEMP_HIGH */       {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* TEMP_HIGH */
-        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition}, /* FAULT */
-        /* EVENT_FAULT_CLEAR */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* FAULT_CLEAR */
-        /* EVENT_SLEEP_TIMEOUT */   {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* SLEEP_TIMEOUT */
-        /* EVENT_WAKEUP */          {STATE_INIT,        FSM_GUARD_NOP,      action_log_transition}, /* WAKEUP */
-        /* EVENT_DEEP_SLEEP_CMD */  {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},   /* DEEP_SLEEP_CMD */
+        /* EVENT_POWER_ON */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_INIT_DONE */       {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_START */       {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_DONE */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_OTA_FAIL */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_PLUG */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_CHARGE_UNPLUG */   {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_ATTACH */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_LOAD_DETACH */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_LOW */        {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_NORMAL */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_TEMP_HIGH */       {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_FAULT */           {STATE_ERROR,       FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_FAULT_CLEAR */     {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_SLEEP_TIMEOUT */   {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
+        /* EVENT_WAKEUP */          {STATE_INIT,        FSM_GUARD_NOP,      action_log_transition},
+        /* EVENT_DEEP_SLEEP_CMD */  {STATE_DEEP_SLEEP,  FSM_GUARD_NOP,      FSM_ACTION_NOP},
     },
 };
 
@@ -439,41 +439,34 @@ static fsm_err_t state_idle_handler(fsm_context_t* ctx, fsm_event_id_t evt, void
 
 /**
  * @brief 充电状态处理函数，实现边充边放逻辑
- * 
- * 当充电状态下负载接入时，根据功率比较决定是否切换放电
  */
 static fsm_err_t state_charging_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    fsm_err_t ret = FSM_ERR_INVALID_EVENT; /* 默认让转移表处理 */
+    fsm_err_t ret = FSM_ERR_INVALID_EVENT;
 
     DEMO_LOG_DBG("CHARGING: processing event %d", evt);
 
     if (evt == EVENT_LOAD_ATTACH)
     {
-        /* 负载接入事件，需要判断功率 */
         if (user != NULL)
         {
             if (user->charger_power >= user->load_power)
             {
-                /* 充电器功率足够，电池继续充电，负载由充电器供电 */
-                user->current = (user->charger_power - user->load_power) * 1000 / user->voltage; /* 近似计算充电电流 */
+                user->current = (user->charger_power - user->load_power) * 1000 / user->voltage;
                 user->load_present = true;
                 DEMO_LOG_INFO("Charger supplies load, battery continues charging");
-                ret = FSM_OK; /* 事件被处理，不触发状态转移 */
+                ret = FSM_OK;
             }
             else
             {
-                /* 充电器功率不足，需要电池放电补充，触发转移到放电状态 */
                 DEMO_LOG_INFO("Charger power insufficient, switching to discharging");
-                /* 返回无效事件，让转移表处理转移到 DISCHARGING */
                 ret = FSM_ERR_INVALID_EVENT;
             }
         }
     }
     else if (evt == EVENT_LOAD_DETACH)
     {
-        /* 负载移除，恢复正常充电 */
         if (user != NULL)
         {
             user->current = user->charger_power * 1000 / user->voltage;
@@ -489,30 +482,26 @@ static fsm_err_t state_charging_handler(fsm_context_t* ctx, fsm_event_id_t evt, 
             if (user->load_present)
             {
                 DEMO_LOG_INFO("Charger unplugged with load attached, switching to discharging");
-                fsm_force_state(ctx, STATE_DISCHARGING);  /* 强制转到放电 */
+                fsm_force_state(ctx, STATE_DISCHARGING);
             }
             else
             {
                 DEMO_LOG_INFO("Charger unplugged, no load, switching to idle");
-                fsm_force_state(ctx, STATE_IDLE);         /* 强制转到空闲 */
+                fsm_force_state(ctx, STATE_IDLE);
             }
         }
-        ret = FSM_OK;  /* 事件已处理，阻止转移表执行 */
+        ret = FSM_OK;
     }
     else if (evt == EVENT_TEMP_NORMAL)
     {
-        /* 温度恢复，可继续充电（不做状态切换） */
         DEMO_LOG_INFO("Temperature normal, continuing charging");
         ret = FSM_OK;
     }
-    /* 其他事件仍让转移表处理 */
     return ret;
 }
 
 /**
  * @brief 放电状态处理函数，实现边充边放逻辑
- * 
- * 当放电状态下充电器插入时，根据功率比较决定是否切换充电
  */
 static fsm_err_t state_discharging_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
@@ -527,17 +516,15 @@ static fsm_err_t state_discharging_handler(fsm_context_t* ctx, fsm_event_id_t ev
         {
             if (user->charger_power >= user->load_power)
             {
-                /* 充电器功率足够，可以转充电，负载由充电器供电 */
                 DEMO_LOG_INFO("Charger plugged with enough power, switching to charging");
-                ret = FSM_ERR_INVALID_EVENT; /* 让转移表处理到 CHARGING */
+                ret = FSM_ERR_INVALID_EVENT;
             }
             else
             {
-                /* 充电器功率不足，电池仍需放电，但充电器可补充一部分 */
                 user->current = -(user->load_power - user->charger_power) * 1000 / user->voltage;
                 user->charger_present = true;
                 DEMO_LOG_INFO("Charger insufficient, continuing discharging with reduced battery current");
-                ret = FSM_OK; /* 事件已处理，不转移 */
+                ret = FSM_OK;
             }
         }
     }
@@ -547,25 +534,22 @@ static fsm_err_t state_discharging_handler(fsm_context_t* ctx, fsm_event_id_t ev
         {
             if (user->charger_present)
             {
-                /* 负载移除但充电器还在，转充电 */
                 DEMO_LOG_INFO("Load detached, charger present, switching to charging");
                 fsm_force_state(ctx, STATE_CHARGING);
             }
             else
             {
-                /* 负载移除且无充电器，转空闲 */
                 DEMO_LOG_INFO("Load detached, no charger, switching to idle");
                 fsm_force_state(ctx, STATE_IDLE);
             }
         }
-        ret = FSM_OK;  /* 事件已处理，阻止转移表执行 */
+        ret = FSM_OK;
     }
     else if (evt == EVENT_TEMP_NORMAL)
     {
         DEMO_LOG_INFO("Temperature normal, continuing discharging");
         ret = FSM_OK;
     }
-
     return ret;
 }
 
@@ -610,13 +594,13 @@ static void on_enter_uninit(fsm_context_t* ctx)
         user->charger_present = false;
         user->load_present = false;
         user->temperature = 25;
-        user->voltage = 12000; /* 12V */
+        user->voltage = 12000;
         user->soc = 50;
         user->fault_code = 0;
         user->ota_in_progress = false;
         user->charger_power = 0;
         user->load_power = 0;
-        user->battery_power = 60000; /* 60W */
+        user->battery_power = 60000;
     }
 }
 
@@ -663,7 +647,6 @@ static void on_enter_charging(fsm_context_t* ctx)
     if (user != NULL)
     {
         user->charger_present = true;
-        /* 初始假设充电器功率足够，无负载 */
         user->current = user->charger_power * 1000 / user->voltage;
     }
 }
@@ -946,7 +929,6 @@ static void print_menu(void)
     DEMO_PRINTF(" p: set charger power (enter new value)\r\n");
     DEMO_PRINTF(" l: set load power (enter new value)\r\n");
     DEMO_PRINTF(" s: show status\r\n");
-    DEMO_PRINTF(" t: simulate time tick (check timeout)\r\n");
     DEMO_PRINTF(" q: quit\r\n");
     DEMO_PRINTF("==========================\r\n");
     DEMO_PRINTF("Select option: ");
@@ -977,7 +959,6 @@ int main(void)
     fsm_config_t config = bms_config;
     fsm_handle_t fsm = NULL;
     char line[32];  /* 输入行缓冲区 */
-    uint32_t sim_time = 0;
 
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
@@ -1027,16 +1008,8 @@ int main(void)
             show_status(fsm, &user_data);
             continue;
         }
-        else if (cmd == 't' || cmd == 'T')
-        {
-            sim_time += 1000;
-            fsm_check_timeout(fsm, sim_time);
-            DEMO_LOG_INFO("Simulated time: %u ms", sim_time);
-            continue;
-        }
         else if (cmd == 'p' || cmd == 'P')
         {
-            /* 解析功率参数，可能在当前行直接给出，如 "p 10" */
             skip_whitespace_and_read_power(line+1, &user_data, 'p');
             DEMO_LOG_INFO("Charger power set to %u W", user_data.charger_power);
             continue;
