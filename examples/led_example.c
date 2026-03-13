@@ -596,17 +596,12 @@ int main(int argc, const char* argv[])
     DEMO_PRINTF("Light Controller State Machine Demo (2D Array Version)\n");
 
     example_basic_usage();
-    DEMO_PRINTF("\nPress Enter to continue to advanced features...");
+    DEMO_PRINTF("Press Enter to continue to advanced features...");
     getchar();
 
     example_advanced_features();
 
-    DEMO_PRINTF("\n=== All Examples Completed ===\n");
-
-#ifdef _WIN32
-    DEMO_PRINTF("\nPress Enter to exit...");
-    getchar();
-#endif
+    DEMO_PRINTF("=== All Examples Completed ===\n");
 
     return ret;
 }
