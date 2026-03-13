@@ -28,11 +28,11 @@
 #endif
 
 #define DEMO_LOG_INFO(fmt, ...) \
-    DEMO_PRINTF("[DEMO_INFO] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[DEMO_INFO] " fmt "\n", ##__VA_ARGS__)
 #define DEMO_LOG_DBG(fmt, ...) \
-    DEMO_PRINTF("[DEMO_DBG] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[DEMO_DBG] " fmt "\n", ##__VA_ARGS__)
 #define DEMO_LOG_ERR(fmt, ...) \
-    DEMO_PRINTF("[DEMO_ERR] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[DEMO_ERR] " fmt "\n", ##__VA_ARGS__)
 
 /*================================================================*/
 /* 类型定义 */
@@ -410,13 +410,13 @@ static void print_light_info(light_user_data_t* data)
 {
     if (data != NULL)
     {
-        DEMO_PRINTF("\r\n--- Light Info ---\r\n");
-        DEMO_PRINTF("Brightness: %u%%\r\n", data->brightness);
-        DEMO_PRINTF("Blink Counter: %u\r\n", data->blink_counter);
-        DEMO_PRINTF("Blink Interval: %u ms\r\n", data->blink_interval);
-        DEMO_PRINTF("Manual Control: %s\r\n", data->manual_control ? "Yes" : "No");
-        DEMO_PRINTF("Description: %s\r\n", data->description);
-        DEMO_PRINTF("-----------------\r\n");
+        DEMO_PRINTF("\n--- Light Info ---\n");
+        DEMO_PRINTF("Brightness: %u%%\n", data->brightness);
+        DEMO_PRINTF("Blink Counter: %u\n", data->blink_counter);
+        DEMO_PRINTF("Blink Interval: %u ms\n", data->blink_interval);
+        DEMO_PRINTF("Manual Control: %s\n", data->manual_control ? "Yes" : "No");
+        DEMO_PRINTF("Description: %s\n", data->description);
+        DEMO_PRINTF("-----------------\n");
     }
 }
 
@@ -541,7 +541,7 @@ void example_advanced_features(void)
     DEMO_LOG_INFO("Test 1: Testing guard condition (invalid blink interval)");
     user_data.blink_interval = 0;
     fsm_process_event(light_fsm, EVENT_SET_BLINK, NULL);
-    DEMO_PRINTF("Current state: %s (should still be OFF)\r\n",
+    DEMO_PRINTF("Current state: %s (should still be OFF)\n",
                 fsm_get_state_name(light_fsm, fsm_get_current_state(light_fsm)));
 
     if ((fsm_get_stats(light_fsm, &stats) == FSM_OK) && (stats.guard_rejections > 0))
@@ -551,15 +551,15 @@ void example_advanced_features(void)
 
     DEMO_LOG_INFO("Test 2: Testing force state");
     fsm_force_state(light_fsm, LIGHT_ON);
-    DEMO_PRINTF("Forced state to ON. Current state: %s\r\n",
+    DEMO_PRINTF("Forced state to ON. Current state: %s\n",
                 fsm_get_state_name(light_fsm, fsm_get_current_state(light_fsm)));
 
-    DEMO_PRINTF("Previous state: %s\r\n",
+    DEMO_PRINTF("Previous state: %s\n",
                 fsm_get_state_name(light_fsm, fsm_get_previous_state(light_fsm)));
 
-    DEMO_PRINTF("Is in ON state? %s\r\n",
+    DEMO_PRINTF("Is in ON state? %s\n",
                 fsm_is_in_state(light_fsm, LIGHT_ON) ? "Yes" : "No");
-    DEMO_PRINTF("Is in OFF state? %s\r\n",
+    DEMO_PRINTF("Is in OFF state? %s\n",
                 fsm_is_in_state(light_fsm, LIGHT_OFF) ? "Yes" : "No");
 
     DEMO_LOG_INFO("Test 3: Testing 2D array access");
@@ -592,19 +592,19 @@ int main(int argc, const char* argv[])
     system("title FSM Light Controller Demo - 2D Array Version");
 #endif
 
-    DEMO_PRINTF("=== FSM Framework Simple Example ===\r\n");
-    DEMO_PRINTF("Light Controller State Machine Demo (2D Array Version)\r\n");
+    DEMO_PRINTF("=== FSM Framework Simple Example ===\n");
+    DEMO_PRINTF("Light Controller State Machine Demo (2D Array Version)\n");
 
     example_basic_usage();
-    DEMO_PRINTF("\r\nPress Enter to continue to advanced features...");
+    DEMO_PRINTF("\nPress Enter to continue to advanced features...");
     getchar();
 
     example_advanced_features();
 
-    DEMO_PRINTF("\r\n=== All Examples Completed ===\r\n");
+    DEMO_PRINTF("\n=== All Examples Completed ===\n");
 
 #ifdef _WIN32
-    DEMO_PRINTF("\r\nPress Enter to exit...");
+    DEMO_PRINTF("\nPress Enter to exit...");
     getchar();
 #endif
 

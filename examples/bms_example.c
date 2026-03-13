@@ -30,13 +30,13 @@
 #endif
 
 #define DEMO_LOG_INFO(fmt, ...) \
-    DEMO_PRINTF("[INFO] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[INFO] " fmt "\n", ##__VA_ARGS__)
 #define DEMO_LOG_DBG(fmt, ...) \
-    DEMO_PRINTF("[DBG] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[DBG] " fmt "\n", ##__VA_ARGS__)
 #define DEMO_LOG_WRN(fmt, ...) \
-    DEMO_PRINTF("[WARN] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[WARN] " fmt "\n", ##__VA_ARGS__)
 #define DEMO_LOG_ERR(fmt, ...) \
-    DEMO_PRINTF("[ERR] " fmt "\r\n", ##__VA_ARGS__)
+    DEMO_PRINTF("[ERR] " fmt "\n", ##__VA_ARGS__)
 
 /*================================================================*/
 /* 类型定义 */
@@ -1075,29 +1075,31 @@ static void skip_whitespace_and_read_power(char* input, bms_user_data_t* user, c
  */
 static void print_menu(void)
 {
-    DEMO_PRINTF("\r\n===== BMS Demo Menu =====\r\n");
-    DEMO_PRINTF(" 0: POWER_ON\r\n");
-    DEMO_PRINTF(" 1: INIT_DONE\r\n");
-    DEMO_PRINTF(" 2: OTA_START\r\n");
-    DEMO_PRINTF(" 3: OTA_DONE\r\n");
-    DEMO_PRINTF(" 4: OTA_FAIL\r\n");
-    DEMO_PRINTF(" 5: CHARGE_PLUG\r\n");
-    DEMO_PRINTF(" 6: CHARGE_UNPLUG\r\n");
-    DEMO_PRINTF(" 7: LOAD_ATTACH\r\n");
-    DEMO_PRINTF(" 8: LOAD_DETACH\r\n");
-    DEMO_PRINTF(" 9: TEMP_LOW\r\n");
-    DEMO_PRINTF("10: TEMP_NORMAL\r\n");
-    DEMO_PRINTF("11: TEMP_HIGH\r\n");
-    DEMO_PRINTF("12: FAULT\r\n");
-    DEMO_PRINTF("13: FAULT_CLEAR\r\n");
-    DEMO_PRINTF("14: SLEEP_TIMEOUT\r\n");
-    DEMO_PRINTF("15: WAKEUP\r\n");
-    DEMO_PRINTF("16: DEEP_SLEEP_CMD\r\n");
-    DEMO_PRINTF(" p: set charger power (enter new value)\r\n");
-    DEMO_PRINTF(" l: set load power (enter new value)\r\n");
-    DEMO_PRINTF(" s: show status\r\n");
-    DEMO_PRINTF(" q: quit\r\n");
-    DEMO_PRINTF("==========================\r\n");
+    DEMO_PRINTF("\n");
+    DEMO_PRINTF("===== BMS Demo Menu =====\n");
+    DEMO_PRINTF(" 0: POWER_ON\n");
+    DEMO_PRINTF(" 1: INIT_DONE\n");
+    DEMO_PRINTF(" 2: OTA_START\n");
+    DEMO_PRINTF(" 3: OTA_DONE\n");
+    DEMO_PRINTF(" 4: OTA_FAIL\n");
+    DEMO_PRINTF(" 5: CHARGE_PLUG\n");
+    DEMO_PRINTF(" 6: CHARGE_UNPLUG\n");
+    DEMO_PRINTF(" 7: LOAD_ATTACH\n");
+    DEMO_PRINTF(" 8: LOAD_DETACH\n");
+    DEMO_PRINTF(" 9: TEMP_LOW\n");
+    DEMO_PRINTF("10: TEMP_NORMAL\n");
+    DEMO_PRINTF("11: TEMP_HIGH\n");
+    DEMO_PRINTF("12: FAULT\n");
+    DEMO_PRINTF("13: FAULT_CLEAR\n");
+    DEMO_PRINTF("14: SLEEP_TIMEOUT\n");
+    DEMO_PRINTF("15: WAKEUP\n");
+    DEMO_PRINTF("16: DEEP_SLEEP_CMD\n");
+    DEMO_PRINTF(" p: set charger power (enter new value)\n");
+    DEMO_PRINTF(" l: set load power (enter new value)\n");
+    DEMO_PRINTF(" s: show status\n");
+    DEMO_PRINTF(" h: show event definition table.\n");
+    DEMO_PRINTF(" q: quit\n");
+    DEMO_PRINTF("==========================\n");
 }
 
 /**
@@ -1106,15 +1108,15 @@ static void print_menu(void)
 static void show_status(fsm_handle_t fsm, bms_user_data_t* user)
 {
     fsm_state_id_t state = fsm_get_current_state(fsm);
-    DEMO_PRINTF("\r\n--- BMS Status ---\r\n");
-    DEMO_PRINTF("State: %s\r\n", fsm_get_state_name(fsm, state));
-    DEMO_PRINTF("Charger: %s (%u W), Load: %s (%u W)\r\n",
+    DEMO_PRINTF("\n--- BMS Status ---\n");
+    DEMO_PRINTF("State: %s\n", fsm_get_state_name(fsm, state));
+    DEMO_PRINTF("Charger: %s (%u W), Load: %s (%u W)\n",
                 user->charger_present ? "Plugged" : "Unplugged", user->charger_power,
                 user->load_present ? "Attached" : "Detached", user->load_power);
-    DEMO_PRINTF("Temp: %d°C, SOC: %u%%, Current: %d mA\r\n",
+    DEMO_PRINTF("Temp: %d°C, SOC: %u%%, Current: %d mA\n",
                 user->temperature, user->soc, user->current);
-    DEMO_PRINTF("Fault code: %u\r\n", user->fault_code);
-    DEMO_PRINTF("OTA in progress: %s\r\n", user->ota_in_progress ? "Yes" : "No");
+    DEMO_PRINTF("Fault code: %u\n", user->fault_code);
+    DEMO_PRINTF("OTA in progress: %s\n", user->ota_in_progress ? "Yes" : "No");
 }
 
 /**
@@ -1130,7 +1132,7 @@ static int get_bms_event(fsm_handle_t fsm, bms_user_data_t* user_data)
 
     while (1)
     {
-        DEMO_PRINTF("\r\nCurrent state: %s > ",
+        DEMO_PRINTF("\nCurrent state: %s > ",
                     fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
         fflush(stdout);
 
@@ -1171,6 +1173,12 @@ static int get_bms_event(fsm_handle_t fsm, bms_user_data_t* user_data)
         {
             skip_whitespace_and_read_power(line+1, user_data, 'l');
             DEMO_LOG_INFO("Load power set to %u W", user_data->load_power);
+            continue;
+        }
+        else if (cmd == 'h' || cmd == 'H' || cmd == '?')
+        {
+            /* 方便查看事件定义 */
+            print_menu();
             continue;
         }
 
