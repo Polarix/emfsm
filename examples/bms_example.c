@@ -15,10 +15,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#define CLEAR_SCREEN() system("cls")
 #else
 #include <unistd.h>
-#define CLEAR_SCREEN() system("clear")
 #endif
 
 /*================================================================*/
@@ -38,9 +36,46 @@
 #define DEMO_LOG_ERR(fmt, ...) \
     DEMO_PRINTF("[ERR] " fmt "\n", ##__VA_ARGS__)
 
+#ifdef _WIN32
+#define CLEAR_SCREEN() system("cls")
+#else
+#define CLEAR_SCREEN() system("clear")
+#endif
+
 /*================================================================*/
 /* 类型定义 */
 /*================================================================*/
+
+/** @brief 充电器信息子结构 */
+typedef struct
+{
+    bool present;           /*!< 充电器是否插入 */
+    uint32_t voltage;       /*!< 充电电压 (mV) */
+    uint32_t current;       /*!< 充电电流 (mA) 正值表示流入电池 */
+    uint32_t power;         /*!< 充电功率 (W) */
+} charger_info_t;
+
+/** @brief 负载信息子结构 */
+typedef struct
+{
+    bool present;           /*!< 负载是否接入 */
+    uint32_t power;         /*!< 负载功率 (W) */
+    /* 电压由电池电压提供，电流可通过功率和电压计算 */
+} load_info_t;
+
+/** @brief 用户数据 - 模拟BMS环境参数 */
+typedef struct
+{
+    charger_info_t charger;     /*!< 充电器信息 */
+    load_info_t load;           /*!< 负载信息 */
+    int16_t temperature;        /*!< 电池温度（摄氏度） */
+    uint32_t battery_voltage;   /*!< 电池电压 (mV) */
+    uint32_t soc;               /*!< 荷电状态 0-100% */
+    uint32_t fault_code;        /*!< 故障码 */
+    bool ota_in_progress;       /*!< OTA进行中标志 */
+    uint32_t battery_power;     /*!< 电池当前允许功率 (W) */
+} bms_user_data_t;
+
 /** @brief BMS状态枚举 */
 typedef enum
 {
@@ -79,23 +114,6 @@ typedef enum
     EVENT_DEEP_SLEEP_CMD,   /*!< 进入深度休眠命令 */
     BMS_EVENT_COUNT
 } bms_event_t;
-
-/** @brief 用户数据 - 模拟BMS环境参数 */
-typedef struct
-{
-    bool charger_present;    /*!< 充电器是否插入 */
-    bool load_present;       /*!< 负载是否接入 */
-    int16_t temperature;     /*!< 电池温度（摄氏度） */
-    uint32_t voltage;        /*!< 电池电压 (mV) */
-    uint32_t current;        /*!< 电流 (mA) 正为充电，负为放电 */
-    uint32_t soc;            /*!< 荷电状态 0-100% */
-    uint32_t fault_code;     /*!< 故障码 */
-    bool ota_in_progress;    /*!< OTA进行中标志 */
-
-    uint32_t charger_power;  /*!< 充电器可用功率 (W) */
-    uint32_t load_power;     /*!< 负载需求功率 (W) */
-    uint32_t battery_power;  /*!< 电池当前允许功率 (W) */
-} bms_user_data_t;
 
 /*================================================================*/
 /* 函数声明（状态处理） */
@@ -465,10 +483,11 @@ static fsm_err_t state_charging_handler(fsm_context_t* ctx, fsm_event_id_t evt, 
     {
         if (user != NULL)
         {
-            if (user->charger_power >= user->load_power)
+            if (user->charger.power >= user->load.power)
             {
-                user->current = (user->charger_power - user->load_power) * 1000 / user->voltage;
-                user->load_present = true;
+                /* 充电器功率足够，电池继续充电，负载由充电器供电 */
+                user->charger.current = (user->charger.power - user->load.power) * 1000 / user->battery_voltage;
+                user->load.present = true;
                 DEMO_LOG_INFO("Charger supplies load, battery continues charging");
                 ret = FSM_OK;
             }
@@ -483,8 +502,8 @@ static fsm_err_t state_charging_handler(fsm_context_t* ctx, fsm_event_id_t evt, 
     {
         if (user != NULL)
         {
-            user->current = user->charger_power * 1000 / user->voltage;
-            user->load_present = false;
+            user->charger.current = user->charger.power * 1000 / user->battery_voltage;
+            user->load.present = false;
             DEMO_LOG_INFO("Load detached, back to normal charging");
             ret = FSM_OK;
         }
@@ -493,7 +512,7 @@ static fsm_err_t state_charging_handler(fsm_context_t* ctx, fsm_event_id_t evt, 
     {
         if (user != NULL)
         {
-            if (user->load_present)
+            if (user->load.present)
             {
                 DEMO_LOG_INFO("Charger unplugged with load attached, switching to discharging");
                 fsm_force_state(ctx, STATE_DISCHARGING);
@@ -528,15 +547,17 @@ static fsm_err_t state_discharging_handler(fsm_context_t* ctx, fsm_event_id_t ev
     {
         if (user != NULL)
         {
-            if (user->charger_power >= user->load_power)
+            if (user->charger.power >= user->load.power)
             {
                 DEMO_LOG_INFO("Charger plugged with enough power, switching to charging");
                 ret = FSM_ERR_INVALID_EVENT;
             }
             else
             {
-                user->current = -(user->load_power - user->charger_power) * 1000 / user->voltage;
-                user->charger_present = true;
+                /* 充电器功率不足，电池仍需放电，但充电器可补充一部分 */
+                /* 电池放电电流 = -(负载功率 - 充电器功率) / 电压 */
+                /* 此处不直接存储总电流，仅用于日志 */
+                user->charger.present = true;
                 DEMO_LOG_INFO("Charger insufficient, continuing discharging with reduced battery current");
                 ret = FSM_OK;
             }
@@ -546,7 +567,7 @@ static fsm_err_t state_discharging_handler(fsm_context_t* ctx, fsm_event_id_t ev
     {
         if (user != NULL)
         {
-            if (user->charger_present)
+            if (user->charger.present)
             {
                 DEMO_LOG_INFO("Load detached, charger present, switching to charging");
                 fsm_force_state(ctx, STATE_CHARGING);
@@ -619,16 +640,18 @@ static void on_enter_uninit(fsm_context_t* ctx)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
-        user->charger_present = false;
-        user->load_present = false;
+        user->charger.present = false;
+        user->load.present = false;
         user->temperature = 25;
-        user->voltage = 12000;
+        user->battery_voltage = 12000;
         user->soc = 50;
         user->fault_code = 0;
         user->ota_in_progress = false;
-        user->charger_power = 0;
-        user->load_power = 0;
+        user->charger.power = 0;
+        user->load.power = 0;
         user->battery_power = 60000;
+        user->charger.current = 0;
+        user->charger.voltage = 0;
     }
 }
 
@@ -685,7 +708,9 @@ static void on_enter_idle(fsm_context_t* ctx)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
-        user->current = 0;
+        /* 清除充电和放电相关状态 */
+        user->charger.current = 0;
+        /* 保持其他参数不变 */
     }
 }
 
@@ -707,8 +732,12 @@ static void on_enter_charging(fsm_context_t* ctx)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
-        user->charger_present = true;
-        user->current = user->charger_power * 1000 / user->voltage;
+        /* 模拟充电开始 */
+        user->charger.present = true;
+        user->charger.voltage = 20000; /* 充电电压20V(20000mV) */
+        /* 计算充电功率和电流 */
+        user->charger.power = 100; /* 假设充电功率100W */
+        user->charger.current = user->charger.power * 1000 / user->battery_voltage;
     }
 }
 
@@ -721,7 +750,11 @@ static void on_exit_charging(fsm_context_t* ctx)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
-        user->charger_present = false;
+        /* 模拟充电结束，相关参数清零 */
+        user->charger.current = 0;
+        user->charger.voltage = 0;
+        user->charger.power = 0;
+        user->charger.present = false;
     }
 }
 
@@ -734,8 +767,10 @@ static void on_enter_discharging(fsm_context_t* ctx)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
-        user->load_present = true;
-        user->current = - (user->load_power * 1000 / user->voltage);
+        /* 模拟放电开始 */
+        user->load.present = true;
+        user->load.power = 200; /* 负载功率200W */
+        /* 放电电流可由功率和电压计算，不单独存储 */
     }
 }
 
@@ -748,7 +783,8 @@ static void on_exit_discharging(fsm_context_t* ctx)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
-        user->load_present = false;
+        user->load.power = 0;   /* 负载卸载，放电功率归零 */
+        user->load.present = false;
     }
 }
 
@@ -893,8 +929,8 @@ static bool guard_can_sleep(fsm_context_t* ctx, void* event_data)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
 
     (void)event_data;
-    can = (user != NULL) && (!user->charger_present) &&
-          (!user->load_present) && (user->fault_code == 0);
+    can = (user != NULL) && (!user->charger.present) &&
+          (!user->load.present) && (user->fault_code == 0);
     return can;
 }
 
@@ -907,8 +943,8 @@ static bool guard_can_deep_sleep(fsm_context_t* ctx, void* event_data)
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
 
     (void)event_data;
-    can = (user != NULL) && (!user->charger_present) &&
-          (!user->load_present) && (user->fault_code == 0);
+    can = (user != NULL) && (!user->charger.present) &&
+          (!user->load.present) && (user->fault_code == 0);
     return can;
 }
 
@@ -922,8 +958,8 @@ static bool guard_can_ota(fsm_context_t* ctx, void* event_data)
 
     (void)event_data;
     can = (user != NULL) && (!user->ota_in_progress) &&
-          (user->fault_code == 0) && (!user->charger_present) &&
-          (!user->load_present);
+          (user->fault_code == 0) && (!user->charger.present) &&
+          (!user->load.present);
     return can;
 }
 
@@ -943,8 +979,8 @@ static void action_start_charging(fsm_context_t* ctx, void* event_data)
     DEMO_LOG_INFO("Action: start charging");
     if (user != NULL)
     {
-        user->charger_present = true;
-        user->current = user->charger_power * 1000 / user->voltage;
+        user->charger.present = true;
+        /* 其他参数在 on_enter_charging 中设置 */
     }
 }
 
@@ -955,7 +991,7 @@ static void action_stop_charging(fsm_context_t* ctx, void* event_data)
     DEMO_LOG_INFO("Action: stop charging");
     if (user != NULL)
     {
-        user->charger_present = false;
+        user->charger.present = false;
     }
 }
 
@@ -966,8 +1002,8 @@ static void action_start_discharging(fsm_context_t* ctx, void* event_data)
     DEMO_LOG_INFO("Action: start discharging");
     if (user != NULL)
     {
-        user->load_present = true;
-        user->current = - (user->load_power * 1000 / user->voltage);
+        user->load.present = true;
+        /* 其他参数在 on_enter_discharging 中设置 */
     }
 }
 
@@ -978,7 +1014,7 @@ static void action_stop_discharging(fsm_context_t* ctx, void* event_data)
     DEMO_LOG_INFO("Action: stop discharging");
     if (user != NULL)
     {
-        user->load_present = false;
+        user->load.present = false;
     }
 }
 
@@ -1049,11 +1085,11 @@ static void skip_whitespace_and_read_power(char* input, bms_user_data_t* user, c
         {
             if (cmd == 'p')
             {
-                user->charger_power = (uint32_t)atoi(buf);
+                user->charger.power = (uint32_t)atoi(buf);
             }
             else
             {
-                user->load_power = (uint32_t)atoi(buf);
+                user->load.power = (uint32_t)atoi(buf);
             }
         }
     }
@@ -1061,11 +1097,11 @@ static void skip_whitespace_and_read_power(char* input, bms_user_data_t* user, c
     {
         if (cmd == 'p')
         {
-            user->charger_power = (uint32_t)atoi(p);
+            user->charger.power = (uint32_t)atoi(p);
         }
         else
         {
-            user->load_power = (uint32_t)atoi(p);
+            user->load.power = (uint32_t)atoi(p);
         }
     }
 }
@@ -1108,13 +1144,25 @@ static void print_menu(void)
 static void show_status(fsm_handle_t fsm, bms_user_data_t* user)
 {
     fsm_state_id_t state = fsm_get_current_state(fsm);
+    int32_t net_current = 0; /* 净电流，正为充，负为放 */
+
+    if (user->charger.present)
+    {
+        net_current += (int32_t)user->charger.current;
+    }
+    if (user->load.present)
+    {
+        /* 负载电流 = 功率 / 电压，单位 mA */
+        net_current -= (int32_t)(user->load.power * 1000 / user->battery_voltage);
+    }
+
     DEMO_PRINTF("\n--- BMS Status ---\n");
     DEMO_PRINTF("State: %s\n", fsm_get_state_name(fsm, state));
     DEMO_PRINTF("Charger: %s (%u W), Load: %s (%u W)\n",
-                user->charger_present ? "Plugged" : "Unplugged", user->charger_power,
-                user->load_present ? "Attached" : "Detached", user->load_power);
-    DEMO_PRINTF("Temp: %d°C, SOC: %u%%, Current: %d mA\n",
-                user->temperature, user->soc, user->current);
+                user->charger.present ? "Plugged" : "Unplugged", user->charger.power,
+                user->load.present ? "Attached" : "Detached", user->load.power);
+    DEMO_PRINTF("Temp: %d°C, SOC: %u%%, Net Current: %d mA\n",
+                user->temperature, user->soc, net_current);
     DEMO_PRINTF("Fault code: %u\n", user->fault_code);
     DEMO_PRINTF("OTA in progress: %s\n", user->ota_in_progress ? "Yes" : "No");
 }
@@ -1166,13 +1214,13 @@ static int get_bms_event(fsm_handle_t fsm, bms_user_data_t* user_data)
         else if (cmd == 'p' || cmd == 'P')
         {
             skip_whitespace_and_read_power(line+1, user_data, 'p');
-            DEMO_LOG_INFO("Charger power set to %u W", user_data->charger_power);
+            DEMO_LOG_INFO("Charger power set to %u W", user_data->charger.power);
             continue;
         }
         else if (cmd == 'l' || cmd == 'L')
         {
             skip_whitespace_and_read_power(line+1, user_data, 'l');
-            DEMO_LOG_INFO("Load power set to %u W", user_data->load_power);
+            DEMO_LOG_INFO("Load power set to %u W", user_data->load.power);
             continue;
         }
         else if (cmd == 'h' || cmd == 'H' || cmd == '?')
@@ -1207,16 +1255,16 @@ static int get_bms_event(fsm_handle_t fsm, bms_user_data_t* user_data)
 /*================================================================*/
 int main(int argc, const char* argv[])
 {
-    fsm_context_t fsm_context;
-    bms_user_data_t user_data = {0};
-    fsm_config_t config = bms_config;
+    fsm_context_t fsm_context = {0};
+    bms_user_data_t user_data = {0};    /* 把记录系统状态的数据作为参数带入事件处理 */
+    fsm_config_t config = bms_config;   /* 状态机配置，通过这个数据结构管理和访问状态表和状态转移表 */
     fsm_handle_t fsm = NULL;
     int ret = 0;
 
 #ifdef _WIN32
+    /* Win32控制台下切换至UTF-8回显，防止乱码。 */
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
-    system("title BMS Demo - FSM with Coexist Charging/Discharging");
 #endif
 
     config.user_data = &user_data;
@@ -1231,12 +1279,12 @@ int main(int argc, const char* argv[])
     {
         DEMO_LOG_INFO("BMS FSM created. Initial state: %s",
                       fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
-
+        /* 启动时显示事件表 */
         print_menu();
-
         /* 主事件循环 */
         while (1)
         {
+            /* 通过键盘输入模拟事件发生 */
             int evt = get_bms_event(fsm, &user_data);
             if (evt == -1)
             {
