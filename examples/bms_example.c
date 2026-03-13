@@ -1029,7 +1029,7 @@ static void action_ota_done(fsm_context_t* ctx, void* event_data)
 }
 
 /*================================================================*/
-/* 辅助函数 */
+/* 辅助函数 - 输入处理 */
 /*================================================================*/
 /**
  * @brief 跳过空白并读取功率值
@@ -1098,7 +1098,6 @@ static void print_menu(void)
     DEMO_PRINTF(" s: show status\r\n");
     DEMO_PRINTF(" q: quit\r\n");
     DEMO_PRINTF("==========================\r\n");
-    DEMO_PRINTF("Select option: ");
 }
 
 /**
@@ -1118,6 +1117,83 @@ static void show_status(fsm_handle_t fsm, bms_user_data_t* user)
     DEMO_PRINTF("OTA in progress: %s\r\n", user->ota_in_progress ? "Yes" : "No");
 }
 
+/**
+ * @brief 获取用户输入的事件或命令
+ * @param fsm FSM句柄
+ * @param user_data 用户数据指针
+ * @return 有效事件号（0~BMS_EVENT_COUNT-1），-1表示退出
+ */
+static int get_bms_event(fsm_handle_t fsm, bms_user_data_t* user_data)
+{
+    char line[32];
+    int evt = -1;
+
+    while (1)
+    {
+        DEMO_PRINTF("\r\nCurrent state: %s > ",
+                    fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
+        fflush(stdout);
+
+        if (fgets(line, sizeof(line), stdin) == NULL)
+        {
+            /* 输入错误，视为退出 */
+            return -1;
+        }
+
+        /* 去除末尾换行符 */
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n')
+        {
+            line[len-1] = '\0';
+        }
+
+        if (line[0] == '\0')
+            continue;
+
+        /* 处理单字符命令 */
+        char cmd = line[0];
+        if (cmd == 'q' || cmd == 'Q')
+        {
+            return -1;  /* 退出 */
+        }
+        else if (cmd == 's' || cmd == 'S')
+        {
+            show_status(fsm, user_data);
+            continue;  /* 继续等待输入 */
+        }
+        else if (cmd == 'p' || cmd == 'P')
+        {
+            skip_whitespace_and_read_power(line+1, user_data, 'p');
+            DEMO_LOG_INFO("Charger power set to %u W", user_data->charger_power);
+            continue;
+        }
+        else if (cmd == 'l' || cmd == 'L')
+        {
+            skip_whitespace_and_read_power(line+1, user_data, 'l');
+            DEMO_LOG_INFO("Load power set to %u W", user_data->load_power);
+            continue;
+        }
+
+        /* 尝试解析整数事件号 */
+        evt = atoi(line);
+        if (evt == 0 && line[0] != '0')
+        {
+            DEMO_LOG_WRN("Unknown command: %s", line);
+            continue;
+        }
+
+        if (evt >= 0 && evt < BMS_EVENT_COUNT)
+        {
+            return evt;  /* 返回有效事件号 */
+        }
+        else
+        {
+            DEMO_LOG_WRN("Invalid event number: %d", evt);
+            continue;
+        }
+    }
+}
+
 /*================================================================*/
 /* 主函数 */
 /*================================================================*/
@@ -1127,7 +1203,6 @@ int main(int argc, const char* argv[])
     bms_user_data_t user_data = {0};
     fsm_config_t config = bms_config;
     fsm_handle_t fsm = NULL;
-    char line[32];  /* 输入行缓冲区 */
     int ret = 0;
 
 #ifdef _WIN32
@@ -1151,68 +1226,19 @@ int main(int argc, const char* argv[])
 
         print_menu();
 
+        /* 主事件循环 */
         while (1)
         {
-            DEMO_PRINTF("\r\nCurrent state: %s > ",
-                        fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
-            fflush(stdout);
-
-            if (fgets(line, sizeof(line), stdin) == NULL)
-                break;
-
-            /* 去除末尾换行符 */
-            size_t len = strlen(line);
-            if (len > 0 && line[len-1] == '\n')
+            int evt = get_bms_event(fsm, &user_data);
+            if (evt == -1)
             {
-                line[len-1] = '\0';
+                break;  /* 退出 */
             }
 
-            if (line[0] == '\0')
-                continue;
-
-            /* 处理单字符命令 */
-            char cmd = line[0];
-            if (cmd == 'q' || cmd == 'Q')
+            fsm_err_t fsm_ret = fsm_process_event(fsm, (fsm_event_id_t)evt, NULL);
+            if (fsm_ret != FSM_OK)
             {
-                break;
-            }
-            else if (cmd == 's' || cmd == 'S')
-            {
-                show_status(fsm, &user_data);
-                continue;
-            }
-            else if (cmd == 'p' || cmd == 'P')
-            {
-                skip_whitespace_and_read_power(line+1, &user_data, 'p');
-                DEMO_LOG_INFO("Charger power set to %u W", user_data.charger_power);
-                continue;
-            }
-            else if (cmd == 'l' || cmd == 'L')
-            {
-                skip_whitespace_and_read_power(line+1, &user_data, 'l');
-                DEMO_LOG_INFO("Load power set to %u W", user_data.load_power);
-                continue;
-            }
-
-            /* 尝试解析整数事件号 */
-            int evt = atoi(line);
-            if (evt == 0 && line[0] != '0')
-            {
-                DEMO_LOG_WRN("Unknown command: %s", line);
-                continue;
-            }
-
-            if (evt >= 0 && evt < BMS_EVENT_COUNT)
-            {
-                fsm_err_t fsm_ret = fsm_process_event(fsm, (fsm_event_id_t)evt, NULL);
-                if (fsm_ret != FSM_OK)
-                {
-                    DEMO_LOG_ERR("Event %d failed: %d", evt, fsm_ret);
-                }
-            }
-            else
-            {
-                DEMO_LOG_WRN("Invalid event number: %d", evt);
+                DEMO_LOG_ERR("Event %d failed: %d", evt, fsm_ret);
             }
         }
 
