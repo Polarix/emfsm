@@ -3,20 +3,9 @@
  * @brief BMS管理系统示例（无超时版本）
  */
 
-/* 独立的示例日志宏 */
-#ifndef DEMO_PRINTF
-    #define DEMO_PRINTF printf
-#endif
-
-#define DEMO_LOG_INFO(fmt, ...) \
-    DEMO_PRINTF("[INFO] " fmt "\r\n", ##__VA_ARGS__)
-#define DEMO_LOG_DBG(fmt, ...) \
-    DEMO_PRINTF("[DBG] " fmt "\r\n", ##__VA_ARGS__)
-#define DEMO_LOG_WRN(fmt, ...) \
-    DEMO_PRINTF("[WARN] " fmt "\r\n", ##__VA_ARGS__)
-#define DEMO_LOG_ERR(fmt, ...) \
-    DEMO_PRINTF("[ERR] " fmt "\r\n", ##__VA_ARGS__)
-
+/*================================================================*/
+/* 头文件包含 */
+/*================================================================*/
 #include "fsm.h"
 #include <stdio.h>
 #include <stdbool.h>
@@ -33,68 +22,84 @@
 #endif
 
 /*================================================================*/
-/* BMS 状态与事件定义                                             */
+/* 宏定义 */
 /*================================================================*/
+/* 独立的示例日志宏 */
+#ifndef DEMO_PRINTF
+    #define DEMO_PRINTF printf
+#endif
 
+#define DEMO_LOG_INFO(fmt, ...) \
+    DEMO_PRINTF("[INFO] " fmt "\r\n", ##__VA_ARGS__)
+#define DEMO_LOG_DBG(fmt, ...) \
+    DEMO_PRINTF("[DBG] " fmt "\r\n", ##__VA_ARGS__)
+#define DEMO_LOG_WRN(fmt, ...) \
+    DEMO_PRINTF("[WARN] " fmt "\r\n", ##__VA_ARGS__)
+#define DEMO_LOG_ERR(fmt, ...) \
+    DEMO_PRINTF("[ERR] " fmt "\r\n", ##__VA_ARGS__)
+
+/*================================================================*/
+/* 类型定义 */
+/*================================================================*/
+/** @brief BMS状态枚举 */
 typedef enum
 {
-    STATE_UNINIT = 0,       /* 未初始化/混沌态 */
-    STATE_INIT,             /* 初始化中 */
-    STATE_OTA,              /* 系统更新(OTA) */
-    STATE_IDLE,             /* 待机/就绪 */
-    STATE_CHARGING,         /* 充电 */
-    STATE_DISCHARGING,      /* 放电 */
-    STATE_HEATING,          /* 加热 */
-    STATE_ERROR,            /* 错误/故障 */
-    STATE_SLEEP,            /* 休眠 */
-    STATE_DEEP_SLEEP,       /* 深度休眠 */
+    STATE_UNINIT = 0,       /*!< 未初始化/混沌态 */
+    STATE_INIT,             /*!< 初始化中 */
+    STATE_OTA,              /*!< 系统更新(OTA) */
+    STATE_IDLE,             /*!< 待机/就绪 */
+    STATE_CHARGING,         /*!< 充电 */
+    STATE_DISCHARGING,      /*!< 放电 */
+    STATE_HEATING,          /*!< 加热 */
+    STATE_ERROR,            /*!< 错误/故障 */
+    STATE_SLEEP,            /*!< 休眠 */
+    STATE_DEEP_SLEEP,       /*!< 深度休眠 */
     BMS_STATE_COUNT
 } bms_state_t;
 
+/** @brief BMS事件枚举 */
 typedef enum
 {
-    EVENT_POWER_ON = 0,     /* 上电 */
-    EVENT_INIT_DONE,        /* 初始化完成 */
-    EVENT_OTA_START,        /* 开始OTA */
-    EVENT_OTA_DONE,         /* OTA完成 */
-    EVENT_OTA_FAIL,         /* OTA失败 */
-    EVENT_CHARGE_PLUG,      /* 充电器插入 */
-    EVENT_CHARGE_UNPLUG,    /* 充电器拔出 */
-    EVENT_LOAD_ATTACH,      /* 负载接入 */
-    EVENT_LOAD_DETACH,      /* 负载移除 */
-    EVENT_TEMP_LOW,         /* 温度过低 */
-    EVENT_TEMP_NORMAL,      /* 温度恢复正常 */
-    EVENT_TEMP_HIGH,        /* 温度过高 */
-    EVENT_FAULT,            /* 故障发生 */
-    EVENT_FAULT_CLEAR,      /* 故障清除 */
-    EVENT_SLEEP_TIMEOUT,    /* 休眠超时（仍保留事件，需手动触发） */
-    EVENT_WAKEUP,           /* 唤醒 */
-    EVENT_DEEP_SLEEP_CMD,   /* 进入深度休眠命令 */
+    EVENT_POWER_ON = 0,     /*!< 上电 */
+    EVENT_INIT_DONE,        /*!< 初始化完成 */
+    EVENT_OTA_START,        /*!< 开始OTA */
+    EVENT_OTA_DONE,         /*!< OTA完成 */
+    EVENT_OTA_FAIL,         /*!< OTA失败 */
+    EVENT_CHARGE_PLUG,      /*!< 充电器插入 */
+    EVENT_CHARGE_UNPLUG,    /*!< 充电器拔出 */
+    EVENT_LOAD_ATTACH,      /*!< 负载接入 */
+    EVENT_LOAD_DETACH,      /*!< 负载移除 */
+    EVENT_TEMP_LOW,         /*!< 温度过低 */
+    EVENT_TEMP_NORMAL,      /*!< 温度恢复正常 */
+    EVENT_TEMP_HIGH,        /*!< 温度过高 */
+    EVENT_FAULT,            /*!< 故障发生 */
+    EVENT_FAULT_CLEAR,      /*!< 故障清除 */
+    EVENT_SLEEP_TIMEOUT,    /*!< 休眠超时（需手动触发） */
+    EVENT_WAKEUP,           /*!< 唤醒 */
+    EVENT_DEEP_SLEEP_CMD,   /*!< 进入深度休眠命令 */
     BMS_EVENT_COUNT
 } bms_event_t;
 
-/* 用户数据 - 模拟BMS环境参数，增加功率模拟 */
+/** @brief 用户数据 - 模拟BMS环境参数 */
 typedef struct
 {
-    bool charger_present;    /* 充电器是否插入 */
-    bool load_present;       /* 负载是否接入 */
-    int16_t temperature;     /* 电池温度（摄氏度） */
-    uint32_t voltage;        /* 电池电压 (mV) */
-    uint32_t current;        /* 电流 (mA) 正为充电，负为放电 */
-    uint32_t soc;            /* 荷电状态 0-100% */
-    uint32_t fault_code;     /* 故障码 */
-    bool ota_in_progress;    /* OTA进行中标志 */
+    bool charger_present;    /*!< 充电器是否插入 */
+    bool load_present;       /*!< 负载是否接入 */
+    int16_t temperature;     /*!< 电池温度（摄氏度） */
+    uint32_t voltage;        /*!< 电池电压 (mV) */
+    uint32_t current;        /*!< 电流 (mA) 正为充电，负为放电 */
+    uint32_t soc;            /*!< 荷电状态 0-100% */
+    uint32_t fault_code;     /*!< 故障码 */
+    bool ota_in_progress;    /*!< OTA进行中标志 */
 
-    /* 新增功率参数（模拟值） */
-    uint32_t charger_power;  /* 充电器可用功率 (W) */
-    uint32_t load_power;     /* 负载需求功率 (W) */
-    uint32_t battery_power;  /* 电池当前允许功率 (W) */
+    uint32_t charger_power;  /*!< 充电器可用功率 (W) */
+    uint32_t load_power;     /*!< 负载需求功率 (W) */
+    uint32_t battery_power;  /*!< 电池当前允许功率 (W) */
 } bms_user_data_t;
 
 /*================================================================*/
-/* 函数声明（状态处理）                                           */
+/* 函数声明（状态处理） */
 /*================================================================*/
-
 static fsm_err_t state_uninit_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data);
 static fsm_err_t state_init_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data);
 static fsm_err_t state_ota_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data);
@@ -149,7 +154,7 @@ static void action_ota_start(fsm_context_t* ctx, void* event_data);
 static void action_ota_done(fsm_context_t* ctx, void* event_data);
 
 /*================================================================*/
-/* 状态表                                                         */
+/* 状态表 */
 /*================================================================*/
 static const fsm_state_t bms_states[] =
 {
@@ -167,7 +172,7 @@ static const fsm_state_t bms_states[] =
 };
 
 /*================================================================*/
-/* 二维转移表                                                     */
+/* 二维转移表 */
 /*================================================================*/
 static const fsm_transition_item_t bms_transition_table[BMS_STATE_COUNT][BMS_EVENT_COUNT] =
 {
@@ -268,7 +273,6 @@ static const fsm_transition_item_t bms_transition_table[BMS_STATE_COUNT][BMS_EVE
         /* EVENT_OTA_DONE */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
         /* EVENT_OTA_FAIL */        {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
         /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
-                                    /* CHARGE_UNPLUG 由状态处理函数直接处理，故设为自循环 */
         /* EVENT_CHARGE_UNPLUG */   {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
         /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, guard_can_discharge, action_stop_charging},
         /* EVENT_LOAD_DETACH */     {STATE_CHARGING,    FSM_GUARD_NOP,      FSM_ACTION_NOP},
@@ -293,7 +297,6 @@ static const fsm_transition_item_t bms_transition_table[BMS_STATE_COUNT][BMS_EVE
         /* EVENT_CHARGE_PLUG */     {STATE_CHARGING,    guard_can_charge,   action_stop_discharging},
         /* EVENT_CHARGE_UNPLUG */   {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
         /* EVENT_LOAD_ATTACH */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
-                                    /* LOAD_DETACH 由状态处理函数直接处理，故设为自循环 */
         /* EVENT_LOAD_DETACH */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
         /* EVENT_TEMP_LOW */        {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
         /* EVENT_TEMP_NORMAL */     {STATE_DISCHARGING, FSM_GUARD_NOP,      FSM_ACTION_NOP},
@@ -406,9 +409,11 @@ static const fsm_config_t bms_config =
 };
 
 /*================================================================*/
-/* 状态处理函数实现                                               */
+/* 状态处理函数实现 */
 /*================================================================*/
-
+/**
+ * @brief 未初始化状态处理
+ */
 static fsm_err_t state_uninit_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -416,6 +421,9 @@ static fsm_err_t state_uninit_handler(fsm_context_t* ctx, fsm_event_id_t evt, vo
     return FSM_ERR_INVALID_EVENT;
 }
 
+/**
+ * @brief 初始化状态处理
+ */
 static fsm_err_t state_init_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -423,6 +431,9 @@ static fsm_err_t state_init_handler(fsm_context_t* ctx, fsm_event_id_t evt, void
     return FSM_ERR_INVALID_EVENT;
 }
 
+/**
+ * @brief OTA状态处理
+ */
 static fsm_err_t state_ota_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -430,6 +441,9 @@ static fsm_err_t state_ota_handler(fsm_context_t* ctx, fsm_event_id_t evt, void*
     return FSM_ERR_INVALID_EVENT;
 }
 
+/**
+ * @brief 空闲状态处理
+ */
 static fsm_err_t state_idle_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -553,6 +567,9 @@ static fsm_err_t state_discharging_handler(fsm_context_t* ctx, fsm_event_id_t ev
     return ret;
 }
 
+/**
+ * @brief 加热状态处理
+ */
 static fsm_err_t state_heating_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -560,6 +577,9 @@ static fsm_err_t state_heating_handler(fsm_context_t* ctx, fsm_event_id_t evt, v
     return FSM_ERR_INVALID_EVENT;
 }
 
+/**
+ * @brief 错误状态处理
+ */
 static fsm_err_t state_error_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -567,6 +587,9 @@ static fsm_err_t state_error_handler(fsm_context_t* ctx, fsm_event_id_t evt, voi
     return FSM_ERR_INVALID_EVENT;
 }
 
+/**
+ * @brief 休眠状态处理
+ */
 static fsm_err_t state_sleep_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -574,6 +597,9 @@ static fsm_err_t state_sleep_handler(fsm_context_t* ctx, fsm_event_id_t evt, voi
     return FSM_ERR_INVALID_EVENT;
 }
 
+/**
+ * @brief 深度休眠状态处理
+ */
 static fsm_err_t state_deep_sleep_handler(fsm_context_t* ctx, fsm_event_id_t evt, void* data)
 {
     (void)ctx; (void)evt; (void)data;
@@ -582,9 +608,11 @@ static fsm_err_t state_deep_sleep_handler(fsm_context_t* ctx, fsm_event_id_t evt
 }
 
 /*================================================================*/
-/* 进入/退出动作函数                                              */
+/* 进入/退出动作函数 */
 /*================================================================*/
-
+/**
+ * @brief 进入未初始化状态
+ */
 static void on_enter_uninit(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Entering UNINIT state");
@@ -604,42 +632,75 @@ static void on_enter_uninit(fsm_context_t* ctx)
     }
 }
 
+/**
+ * @brief 进入初始化状态
+ */
 static void on_enter_init(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Entering INIT state - initializing hardware...");
 }
 
+/**
+ * @brief 退出初始化状态
+ */
 static void on_exit_init(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Exiting INIT state - initialization done");
 }
 
+/**
+ * @brief 进入OTA状态
+ */
 static void on_enter_ota(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Entering OTA state - firmware update started");
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->ota_in_progress = true;
+    if (user != NULL)
+    {
+        user->ota_in_progress = true;
+    }
 }
 
+/**
+ * @brief 退出OTA状态
+ */
 static void on_exit_ota(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Exiting OTA state");
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->ota_in_progress = false;
+    if (user != NULL)
+    {
+        user->ota_in_progress = false;
+    }
 }
 
+/**
+ * @brief 进入空闲状态
+ */
 static void on_enter_idle(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Entering IDLE state - ready");
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->current = 0;
+    if (user != NULL)
+    {
+        user->current = 0;
+    }
 }
 
+/**
+ * @brief 退出空闲状态
+ */
 static void on_exit_idle(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Exiting IDLE state");
 }
 
+/**
+ * @brief 进入充电状态
+ */
 static void on_enter_charging(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Entering CHARGING state - charging started");
@@ -651,13 +712,22 @@ static void on_enter_charging(fsm_context_t* ctx)
     }
 }
 
+/**
+ * @brief 退出充电状态
+ */
 static void on_exit_charging(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Exiting CHARGING state");
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->charger_present = false;
+    if (user != NULL)
+    {
+        user->charger_present = false;
+    }
 }
 
+/**
+ * @brief 进入放电状态
+ */
 static void on_enter_discharging(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Entering DISCHARGING state - discharging started");
@@ -669,64 +739,109 @@ static void on_enter_discharging(fsm_context_t* ctx)
     }
 }
 
+/**
+ * @brief 退出放电状态
+ */
 static void on_exit_discharging(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Exiting DISCHARGING state");
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->load_present = false;
+    if (user != NULL)
+    {
+        user->load_present = false;
+    }
 }
 
+/**
+ * @brief 进入加热状态
+ */
 static void on_enter_heating(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Entering HEATING state - heating enabled");
 }
 
+/**
+ * @brief 退出加热状态
+ */
 static void on_exit_heating(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Exiting HEATING state");
 }
 
+/**
+ * @brief 进入错误状态
+ */
 static void on_enter_error(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_ERR("Entering ERROR state - fault detected");
 }
 
+/**
+ * @brief 退出错误状态
+ */
 static void on_exit_error(fsm_context_t* ctx)
 {
     DEMO_LOG_INFO("Exiting ERROR state - fault cleared");
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->fault_code = 0;
+    if (user != NULL)
+    {
+        user->fault_code = 0;
+    }
 }
 
+/**
+ * @brief 进入休眠状态
+ */
 static void on_enter_sleep(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Entering SLEEP state");
 }
 
+/**
+ * @brief 退出休眠状态
+ */
 static void on_exit_sleep(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Exiting SLEEP state");
 }
 
+/**
+ * @brief 进入深度休眠状态
+ */
 static void on_enter_deep_sleep(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Entering DEEP SLEEP state");
 }
 
+/**
+ * @brief 退出深度休眠状态
+ */
 static void on_exit_deep_sleep(fsm_context_t* ctx)
 {
+    (void)ctx;
     DEMO_LOG_INFO("Exiting DEEP SLEEP state");
 }
 
 /*================================================================*/
-/* 守卫条件函数实现                                               */
+/* 守卫条件函数实现 */
 /*================================================================*/
-
+/**
+ * @brief 检查是否可以充电
+ */
 static bool guard_can_charge(fsm_context_t* ctx, void* event_data)
 {
+    bool can = false;
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    bool can = (user != NULL) && (!user->ota_in_progress) &&
-               (user->fault_code == 0) && (user->soc < 100);
+
+    (void)event_data;
+    can = (user != NULL) && (!user->ota_in_progress) &&
+          (user->fault_code == 0) && (user->soc < 100);
     if (!can)
     {
         DEMO_LOG_WRN("Guard: Cannot charge (ota=%d, fault=%u, soc=%u)",
@@ -737,12 +852,17 @@ static bool guard_can_charge(fsm_context_t* ctx, void* event_data)
     return can;
 }
 
+/**
+ * @brief 检查是否可以放电
+ */
 static bool guard_can_discharge(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    bool can = false;
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    bool can = (user != NULL) && (!user->ota_in_progress) &&
-               (user->fault_code == 0) && (user->soc > 0);
+
+    (void)event_data;
+    can = (user != NULL) && (!user->ota_in_progress) &&
+          (user->fault_code == 0) && (user->soc > 0);
     if (!can)
     {
         DEMO_LOG_WRN("Guard: Cannot discharge");
@@ -750,58 +870,77 @@ static bool guard_can_discharge(fsm_context_t* ctx, void* event_data)
     return can;
 }
 
+/**
+ * @brief 检查是否可以加热
+ */
 static bool guard_can_heat(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    bool can = false;
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    bool can = (user != NULL) && (!user->ota_in_progress) &&
-               (user->fault_code == 0) && (user->temperature < 5);
+
+    (void)event_data;
+    can = (user != NULL) && (!user->ota_in_progress) &&
+          (user->fault_code == 0) && (user->temperature < 5);
     return can;
 }
 
+/**
+ * @brief 检查是否可以进入休眠
+ */
 static bool guard_can_sleep(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    bool can = false;
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    bool can = (user != NULL) && (!user->charger_present) &&
-               (!user->load_present) && (user->fault_code == 0);
+
+    (void)event_data;
+    can = (user != NULL) && (!user->charger_present) &&
+          (!user->load_present) && (user->fault_code == 0);
     return can;
 }
 
+/**
+ * @brief 检查是否可以进入深度休眠
+ */
 static bool guard_can_deep_sleep(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    bool can = false;
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    bool can = (user != NULL) && (!user->charger_present) &&
-               (!user->load_present) && (user->fault_code == 0);
+
+    (void)event_data;
+    can = (user != NULL) && (!user->charger_present) &&
+          (!user->load_present) && (user->fault_code == 0);
     return can;
 }
 
+/**
+ * @brief 检查是否可以进行OTA
+ */
 static bool guard_can_ota(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    bool can = false;
     bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    bool can = (user != NULL) && (!user->ota_in_progress) &&
-               (user->fault_code == 0) && (!user->charger_present) &&
-               (!user->load_present);
+
+    (void)event_data;
+    can = (user != NULL) && (!user->ota_in_progress) &&
+          (user->fault_code == 0) && (!user->charger_present) &&
+          (!user->load_present);
     return can;
 }
 
 /*================================================================*/
-/* 转移动作函数实现                                               */
+/* 转移动作函数实现 */
 /*================================================================*/
-
 static void action_log_transition(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    (void)ctx; (void)event_data;
     DEMO_LOG_DBG("Transition action: log only");
 }
 
 static void action_start_charging(fsm_context_t* ctx, void* event_data)
 {
+    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     (void)event_data;
     DEMO_LOG_INFO("Action: start charging");
-    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
         user->charger_present = true;
@@ -811,17 +950,20 @@ static void action_start_charging(fsm_context_t* ctx, void* event_data)
 
 static void action_stop_charging(fsm_context_t* ctx, void* event_data)
 {
+    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     (void)event_data;
     DEMO_LOG_INFO("Action: stop charging");
-    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->charger_present = false;
+    if (user != NULL)
+    {
+        user->charger_present = false;
+    }
 }
 
 static void action_start_discharging(fsm_context_t* ctx, void* event_data)
 {
+    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     (void)event_data;
     DEMO_LOG_INFO("Action: start discharging");
-    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     if (user != NULL)
     {
         user->load_present = true;
@@ -831,56 +973,70 @@ static void action_start_discharging(fsm_context_t* ctx, void* event_data)
 
 static void action_stop_discharging(fsm_context_t* ctx, void* event_data)
 {
+    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     (void)event_data;
     DEMO_LOG_INFO("Action: stop discharging");
-    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->load_present = false;
+    if (user != NULL)
+    {
+        user->load_present = false;
+    }
 }
 
 static void action_start_heating(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    (void)ctx; (void)event_data;
     DEMO_LOG_INFO("Action: start heating");
 }
 
 static void action_stop_heating(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    (void)ctx; (void)event_data;
     DEMO_LOG_INFO("Action: stop heating");
 }
 
 static void action_enter_sleep(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    (void)ctx; (void)event_data;
     DEMO_LOG_INFO("Action: entering sleep mode");
 }
 
 static void action_enter_deep_sleep(fsm_context_t* ctx, void* event_data)
 {
-    (void)event_data;
+    (void)ctx; (void)event_data;
     DEMO_LOG_INFO("Action: entering deep sleep mode");
 }
 
 static void action_ota_start(fsm_context_t* ctx, void* event_data)
 {
+    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     (void)event_data;
     DEMO_LOG_INFO("Action: OTA started");
-    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->ota_in_progress = true;
+    if (user != NULL)
+    {
+        user->ota_in_progress = true;
+    }
 }
 
 static void action_ota_done(fsm_context_t* ctx, void* event_data)
 {
+    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
     (void)event_data;
     DEMO_LOG_INFO("Action: OTA completed");
-    bms_user_data_t* user = (bms_user_data_t*)ctx->config->user_data;
-    if (user != NULL) user->ota_in_progress = false;
+    if (user != NULL)
+    {
+        user->ota_in_progress = false;
+    }
 }
 
 /*================================================================*/
-/* 辅助函数                                                       */
+/* 辅助函数 */
 /*================================================================*/
-
+/**
+ * @brief 跳过空白并读取功率值
+ * @param input 输入字符串
+ * @param user 用户数据
+ * @param cmd 命令字符（'p'或'l'）
+ */
 static void skip_whitespace_and_read_power(char* input, bms_user_data_t* user, char cmd)
 {
     char* p = input;
@@ -892,20 +1048,31 @@ static void skip_whitespace_and_read_power(char* input, bms_user_data_t* user, c
         if (fgets(buf, sizeof(buf), stdin) != NULL)
         {
             if (cmd == 'p')
+            {
                 user->charger_power = (uint32_t)atoi(buf);
+            }
             else
+            {
                 user->load_power = (uint32_t)atoi(buf);
+            }
         }
     }
     else
     {
         if (cmd == 'p')
+        {
             user->charger_power = (uint32_t)atoi(p);
+        }
         else
+        {
             user->load_power = (uint32_t)atoi(p);
+        }
     }
 }
 
+/**
+ * @brief 打印菜单
+ */
 static void print_menu(void)
 {
     DEMO_PRINTF("\r\n===== BMS Demo Menu =====\r\n");
@@ -934,6 +1101,9 @@ static void print_menu(void)
     DEMO_PRINTF("Select option: ");
 }
 
+/**
+ * @brief 显示状态
+ */
 static void show_status(fsm_handle_t fsm, bms_user_data_t* user)
 {
     fsm_state_id_t state = fsm_get_current_state(fsm);
@@ -949,16 +1119,16 @@ static void show_status(fsm_handle_t fsm, bms_user_data_t* user)
 }
 
 /*================================================================*/
-/* 主函数                                                         */
+/* 主函数 */
 /*================================================================*/
-
-int main(void)
+int main(int argc, const char* argv[])
 {
     fsm_context_t fsm_context;
     bms_user_data_t user_data = {0};
     fsm_config_t config = bms_config;
     fsm_handle_t fsm = NULL;
     char line[32];  /* 输入行缓冲区 */
+    int ret = 0;
 
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
@@ -972,78 +1142,83 @@ int main(void)
     if (fsm == NULL)
     {
         DEMO_LOG_ERR("Failed to create FSM!");
-        return -1;
+        ret = -1;
     }
-
-    DEMO_LOG_INFO("BMS FSM created. Initial state: %s",
-                  fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
-
-    print_menu();
-
-    while (1)
+    else
     {
-        DEMO_PRINTF("\r\nCurrent state: %s > ",
-                    fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
-        fflush(stdout);
+        DEMO_LOG_INFO("BMS FSM created. Initial state: %s",
+                      fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
 
-        if (fgets(line, sizeof(line), stdin) == NULL)
-            break;
+        print_menu();
 
-        /* 去除末尾换行符 */
-        size_t len = strlen(line);
-        if (len > 0 && line[len-1] == '\n')
-            line[len-1] = '\0';
+        while (1)
+        {
+            DEMO_PRINTF("\r\nCurrent state: %s > ",
+                        fsm_get_state_name(fsm, fsm_get_current_state(fsm)));
+            fflush(stdout);
 
-        if (line[0] == '\0')
-            continue;
+            if (fgets(line, sizeof(line), stdin) == NULL)
+                break;
 
-        /* 处理单字符命令 */
-        char cmd = line[0];
-        if (cmd == 'q' || cmd == 'Q')
-        {
-            break;
-        }
-        else if (cmd == 's' || cmd == 'S')
-        {
-            show_status(fsm, &user_data);
-            continue;
-        }
-        else if (cmd == 'p' || cmd == 'P')
-        {
-            skip_whitespace_and_read_power(line+1, &user_data, 'p');
-            DEMO_LOG_INFO("Charger power set to %u W", user_data.charger_power);
-            continue;
-        }
-        else if (cmd == 'l' || cmd == 'L')
-        {
-            skip_whitespace_and_read_power(line+1, &user_data, 'l');
-            DEMO_LOG_INFO("Load power set to %u W", user_data.load_power);
-            continue;
-        }
-
-        /* 尝试解析整数事件号 */
-        int evt = atoi(line);
-        if (evt == 0 && line[0] != '0')
-        {
-            DEMO_LOG_WRN("Unknown command: %s", line);
-            continue;
-        }
-
-        if (evt >= 0 && evt < BMS_EVENT_COUNT)
-        {
-            fsm_err_t ret = fsm_process_event(fsm, (fsm_event_id_t)evt, NULL);
-            if (ret != FSM_OK)
+            /* 去除末尾换行符 */
+            size_t len = strlen(line);
+            if (len > 0 && line[len-1] == '\n')
             {
-                DEMO_LOG_ERR("Event %d failed: %d", evt, ret);
+                line[len-1] = '\0';
+            }
+
+            if (line[0] == '\0')
+                continue;
+
+            /* 处理单字符命令 */
+            char cmd = line[0];
+            if (cmd == 'q' || cmd == 'Q')
+            {
+                break;
+            }
+            else if (cmd == 's' || cmd == 'S')
+            {
+                show_status(fsm, &user_data);
+                continue;
+            }
+            else if (cmd == 'p' || cmd == 'P')
+            {
+                skip_whitespace_and_read_power(line+1, &user_data, 'p');
+                DEMO_LOG_INFO("Charger power set to %u W", user_data.charger_power);
+                continue;
+            }
+            else if (cmd == 'l' || cmd == 'L')
+            {
+                skip_whitespace_and_read_power(line+1, &user_data, 'l');
+                DEMO_LOG_INFO("Load power set to %u W", user_data.load_power);
+                continue;
+            }
+
+            /* 尝试解析整数事件号 */
+            int evt = atoi(line);
+            if (evt == 0 && line[0] != '0')
+            {
+                DEMO_LOG_WRN("Unknown command: %s", line);
+                continue;
+            }
+
+            if (evt >= 0 && evt < BMS_EVENT_COUNT)
+            {
+                fsm_err_t fsm_ret = fsm_process_event(fsm, (fsm_event_id_t)evt, NULL);
+                if (fsm_ret != FSM_OK)
+                {
+                    DEMO_LOG_ERR("Event %d failed: %d", evt, fsm_ret);
+                }
+            }
+            else
+            {
+                DEMO_LOG_WRN("Invalid event number: %d", evt);
             }
         }
-        else
-        {
-            DEMO_LOG_WRN("Invalid event number: %d", evt);
-        }
+
+        fsm_destroy(fsm);
+        DEMO_LOG_INFO("BMS Demo ended.");
     }
 
-    fsm_destroy(fsm);
-    DEMO_LOG_INFO("BMS Demo ended.");
-    return 0;
+    return ret;
 }

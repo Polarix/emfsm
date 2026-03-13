@@ -3,18 +3,9 @@
  * @brief FSM框架简单示例 - LED灯光控制器（无超时）
  */
 
-/* 示例程序独立定义自己的日志宏，与框架解耦 */
-#ifndef DEMO_PRINTF
-    #define DEMO_PRINTF printf
-#endif
-
-#define DEMO_LOG_INFO(fmt, ...) \
-    DEMO_PRINTF("[DEMO_INFO] " fmt "\r\n", ##__VA_ARGS__)
-#define DEMO_LOG_DBG(fmt, ...) \
-    DEMO_PRINTF("[DEMO_DBG] " fmt "\r\n", ##__VA_ARGS__)
-#define DEMO_LOG_ERR(fmt, ...) \
-    DEMO_PRINTF("[DEMO_ERR] " fmt "\r\n", ##__VA_ARGS__)
-
+/*================================================================*/
+/* 头文件包含 */
+/*================================================================*/
 #include "fsm.h"
 #include <stdio.h>
 #include <stdbool.h>
@@ -29,42 +20,64 @@
 #endif
 
 /*================================================================*/
-/* 状态与事件定义                                                 */
+/* 宏定义 */
 /*================================================================*/
+/* 独立的示例日志宏 */
+#ifndef DEMO_PRINTF
+    #define DEMO_PRINTF printf
+#endif
+
+#define DEMO_LOG_INFO(fmt, ...) \
+    DEMO_PRINTF("[DEMO_INFO] " fmt "\r\n", ##__VA_ARGS__)
+#define DEMO_LOG_DBG(fmt, ...) \
+    DEMO_PRINTF("[DEMO_DBG] " fmt "\r\n", ##__VA_ARGS__)
+#define DEMO_LOG_ERR(fmt, ...) \
+    DEMO_PRINTF("[DEMO_ERR] " fmt "\r\n", ##__VA_ARGS__)
+
+/*================================================================*/
+/* 类型定义 */
+/*================================================================*/
+/** @brief LED状态枚举 */
 typedef enum
 {
-    LIGHT_OFF = 0,      /* 灯光关闭 */
-    LIGHT_ON,           /* 灯光常亮 */
-    LIGHT_BLINKING,     /* 灯光闪烁 */
+    LIGHT_OFF = 0,      /*!< 灯光关闭 */
+    LIGHT_ON,           /*!< 灯光常亮 */
+    LIGHT_BLINKING,     /*!< 灯光闪烁 */
     LIGHT_STATE_COUNT
 } light_state_t;
 
+/** @brief LED事件枚举 */
 typedef enum
 {
-    EVENT_TURN_ON = 0,  /* 打开灯光 */
-    EVENT_TURN_OFF,     /* 关闭灯光 */
-    EVENT_TOGGLE,       /* 切换灯光 */
-    EVENT_SET_BLINK,    /* 设置为闪烁模式 */
-    EVENT_TIMER_TICK,   /* 定时器滴答（用于闪烁） */
+    EVENT_TURN_ON = 0,  /*!< 打开灯光 */
+    EVENT_TURN_OFF,     /*!< 关闭灯光 */
+    EVENT_TOGGLE,       /*!< 切换灯光 */
+    EVENT_SET_BLINK,    /*!< 设置为闪烁模式 */
+    EVENT_TIMER_TICK,   /*!< 定时器滴答（用于闪烁） */
     LIGHT_EVENT_COUNT
 } light_event_t;
 
+/** @brief 用户数据结构 */
 typedef struct
 {
-    uint32_t blink_counter;     /* 闪烁计数器 */
-    uint32_t brightness;        /* 亮度值（0-100） */
-    uint32_t blink_interval;    /* 闪烁间隔（ms） */
-    bool manual_control;        /* 手动控制标志 */
-    char description[32];       /* 描述信息 */
+    uint32_t blink_counter;     /*!< 闪烁计数器 */
+    uint32_t brightness;        /*!< 亮度值（0-100） */
+    uint32_t blink_interval;    /*!< 闪烁间隔（ms） */
+    bool manual_control;        /*!< 手动控制标志 */
+    char description[32];       /*!< 描述信息 */
 } light_user_data_t;
 
 /*================================================================*/
-/* 状态处理函数                                                   */
+/* 状态处理函数 */
 /*================================================================*/
+/**
+ * @brief 关灯状态处理函数
+ */
 static fsm_err_t state_off_handler(fsm_context_t* context,
                                     fsm_event_id_t event,
                                     void* event_data)
 {
+    fsm_err_t ret = FSM_ERR_INVALID_EVENT;
     (void)event_data;
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
 
@@ -76,34 +89,44 @@ static fsm_err_t state_off_handler(fsm_context_t* context,
             DEMO_LOG_DBG("TURN_ON -> Switching to ON state");
             if (user_data != NULL)
             {
-                user_data->brightness = 100;  /* 默认亮度100% */
+                user_data->brightness = 100;
                 snprintf(user_data->description, sizeof(user_data->description),
                          "Turned ON from OFF");
             }
-            return FSM_ERR_INVALID_EVENT;  /* 让转移表处理状态切换 */
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_TOGGLE:
             DEMO_LOG_DBG("TOGGLE -> Switching to ON state");
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_SET_BLINK:
             DEMO_LOG_DBG("SET_BLINK -> Switching to BLINKING state");
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_TIMER_TICK:
             DEMO_LOG_DBG("TIMER_TICK (ignored in OFF state)");
-            return FSM_OK;  /* 直接处理，不进行状态转移 */
+            ret = FSM_OK;
+            break;
 
         default:
             DEMO_LOG_DBG("UNKNOWN event %u", event);
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
     }
+    return ret;
 }
 
+/**
+ * @brief 开灯状态处理函数
+ */
 static fsm_err_t state_on_handler(fsm_context_t* context,
                                    fsm_event_id_t event,
                                    void* event_data)
 {
+    fsm_err_t ret = FSM_ERR_INVALID_EVENT;
     (void)event_data;
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
 
@@ -119,11 +142,13 @@ static fsm_err_t state_on_handler(fsm_context_t* context,
                 snprintf(user_data->description, sizeof(user_data->description),
                          "Turned OFF from ON");
             }
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_TOGGLE:
             DEMO_LOG_DBG("TOGGLE -> Switching to OFF state");
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_SET_BLINK:
             DEMO_LOG_DBG("SET_BLINK -> Switching to BLINKING state");
@@ -132,22 +157,30 @@ static fsm_err_t state_on_handler(fsm_context_t* context,
                 snprintf(user_data->description, sizeof(user_data->description),
                          "Entering blink mode");
             }
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_TIMER_TICK:
             DEMO_LOG_DBG("TIMER_TICK (ignored in ON state)");
-            return FSM_OK;
+            ret = FSM_OK;
+            break;
 
         default:
             DEMO_LOG_DBG("UNKNOWN event %u", event);
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
     }
+    return ret;
 }
 
+/**
+ * @brief 闪烁状态处理函数
+ */
 static fsm_err_t state_blinking_handler(fsm_context_t* context,
                                          fsm_event_id_t event,
                                          void* event_data)
 {
+    fsm_err_t ret = FSM_ERR_INVALID_EVENT;
     (void)event_data;
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
 
@@ -164,7 +197,8 @@ static fsm_err_t state_blinking_handler(fsm_context_t* context,
                 snprintf(user_data->description, sizeof(user_data->description),
                          "Blinking stopped, light OFF");
             }
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_TURN_ON:
             DEMO_LOG_DBG("TURN_ON -> Switching to ON state");
@@ -175,7 +209,8 @@ static fsm_err_t state_blinking_handler(fsm_context_t* context,
                 snprintf(user_data->description, sizeof(user_data->description),
                          "Blinking stopped, light ON");
             }
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
 
         case EVENT_TIMER_TICK:
             /* 处理闪烁逻辑 */
@@ -183,7 +218,6 @@ static fsm_err_t state_blinking_handler(fsm_context_t* context,
             {
                 user_data->blink_counter++;
 
-                /* 每两次滴答切换一次亮度（模拟闪烁） */
                 if (user_data->blink_counter % 2 == 0)
                 {
                     user_data->brightness = 100;
@@ -196,24 +230,33 @@ static fsm_err_t state_blinking_handler(fsm_context_t* context,
                 }
 
                 /* 闪烁10次后自动停止 */
-                if (user_data->blink_counter >= 20)   /* 10次完整闪烁（开-关为一个完整闪烁） */
+                if (user_data->blink_counter >= 20)
                 {
                     DEMO_LOG_DBG("Auto-stopping blink after 10 cycles");
                     user_data->manual_control = false;
-                    return FSM_ERR_INVALID_EVENT;  /* 触发自动转移 */
+                    ret = FSM_ERR_INVALID_EVENT;  /* 触发自动转移 */
+                }
+                else
+                {
+                    ret = FSM_OK;  /* 已处理，不触发状态转移 */
                 }
             }
-            return FSM_OK;  /* 已处理，不触发状态转移 */
+            break;
 
         default:
             DEMO_LOG_DBG("UNKNOWN event %u", event);
-            return FSM_ERR_INVALID_EVENT;
+            ret = FSM_ERR_INVALID_EVENT;
+            break;
     }
+    return ret;
 }
 
 /*================================================================*/
-/* 状态进入/退出函数                                              */
+/* 状态进入/退出函数 */
 /*================================================================*/
+/**
+ * @brief 进入关灯状态
+ */
 static void on_enter_off(fsm_context_t* context)
 {
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
@@ -226,6 +269,9 @@ static void on_enter_off(fsm_context_t* context)
     DEMO_LOG_DBG("-> Light turned OFF");
 }
 
+/**
+ * @brief 进入开灯状态
+ */
 static void on_enter_on(fsm_context_t* context)
 {
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
@@ -239,13 +285,16 @@ static void on_enter_on(fsm_context_t* context)
     DEMO_LOG_DBG("-> Light turned ON");
 }
 
+/**
+ * @brief 进入闪烁状态
+ */
 static void on_enter_blinking(fsm_context_t* context)
 {
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
     if (user_data != NULL)
     {
         user_data->blink_counter = 0;
-        user_data->brightness = 100;  /* 闪烁开始时为亮 */
+        user_data->brightness = 100;
         user_data->manual_control = true;
         snprintf(user_data->description, sizeof(user_data->description),
                  "Light is BLINKING (interval: %ums)", user_data->blink_interval);
@@ -253,6 +302,9 @@ static void on_enter_blinking(fsm_context_t* context)
     DEMO_LOG_DBG("-> Light started BLINKING");
 }
 
+/**
+ * @brief 退出闪烁状态
+ */
 static void on_exit_blinking(fsm_context_t* context)
 {
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
@@ -264,25 +316,31 @@ static void on_exit_blinking(fsm_context_t* context)
 }
 
 /*================================================================*/
-/* 守卫条件函数                                                   */
+/* 守卫条件函数 */
 /*================================================================*/
+/**
+ * @brief 检查是否可以进入闪烁模式
+ */
 static bool guard_can_blink(fsm_context_t* context, void* event_data)
 {
+    bool can = true;
     (void)event_data;
     light_user_data_t* user_data = (light_user_data_t*)context->config->user_data;
 
     if ((user_data != NULL) && (user_data->blink_interval == 0))
     {
         DEMO_LOG_DBG("Guard: Cannot blink - interval is 0");
-        return false;
+        can = false;
     }
-
-    return true;
+    return can;
 }
 
 /*================================================================*/
-/* 转移动作函数                                                   */
+/* 转移动作函数 */
 /*================================================================*/
+/**
+ * @brief 转移动作：记录灯光变化
+ */
 static void action_log_light_change(fsm_context_t* context, void* event_data)
 {
     (void)event_data;
@@ -295,7 +353,7 @@ static void action_log_light_change(fsm_context_t* context, void* event_data)
 }
 
 /*================================================================*/
-/* 状态表                                                         */
+/* 状态表 */
 /*================================================================*/
 static const fsm_state_t light_states[] =
 {
@@ -306,7 +364,7 @@ static const fsm_state_t light_states[] =
 };
 
 /*================================================================*/
-/* 二维转移表                                                     */
+/* 状态转移表 */
 /*================================================================*/
 static const fsm_transition_item_t light_transition_table[LIGHT_STATE_COUNT][LIGHT_EVENT_COUNT] =
 {
@@ -342,8 +400,12 @@ static const fsm_transition_item_t light_transition_table[LIGHT_STATE_COUNT][LIG
 };
 
 /*================================================================*/
-/* 辅助函数                                                       */
+/* 辅助函数 */
 /*================================================================*/
+/**
+ * @brief 打印灯光信息
+ * @param data 用户数据
+ */
 static void print_light_info(light_user_data_t* data)
 {
     if (data != NULL)
@@ -359,8 +421,11 @@ static void print_light_info(light_user_data_t* data)
 }
 
 /*================================================================*/
-/* 示例函数                                                       */
+/* 示例函数 */
 /*================================================================*/
+/**
+ * @brief 基本使用示例
+ */
 void example_basic_usage(void)
 {
     fsm_context_t fsm_context;
@@ -398,37 +463,31 @@ void example_basic_usage(void)
                   fsm_get_state_name(light_fsm, fsm_get_current_state(light_fsm)));
     print_light_info(&user_data);
 
-    /* 测试1: 打开灯光 */
     DEMO_LOG_INFO("Test 1: Turning light ON");
     fsm_process_event(light_fsm, EVENT_TURN_ON, NULL);
     print_light_info(&user_data);
 
-    /* 测试2: 切换灯光 */
     DEMO_LOG_INFO("Test 2: Toggling light");
     fsm_process_event(light_fsm, EVENT_TOGGLE, NULL);
     print_light_info(&user_data);
 
-    /* 测试3: 设置为闪烁模式 */
     DEMO_LOG_INFO("Test 3: Setting blink mode");
     fsm_process_event(light_fsm, EVENT_SET_BLINK, NULL);
     print_light_info(&user_data);
 
-    /* 测试4: 模拟定时器滴答（闪烁） */
     DEMO_LOG_INFO("Test 4: Simulating timer ticks for blinking");
     for (i = 0; i < 5; i++)
     {
         DEMO_PRINTF("Timer tick %d: ", i + 1);
         fsm_process_event(light_fsm, EVENT_TIMER_TICK, NULL);
         print_light_info(&user_data);
-        sleep_ms(300);  /* Windows下等待300ms */
+        sleep_ms(300);
     }
 
-    /* 测试5: 强制停止闪烁 */
     DEMO_LOG_INFO("Test 5: Turning light OFF during blinking");
     fsm_process_event(light_fsm, EVENT_TURN_OFF, NULL);
     print_light_info(&user_data);
 
-    /* 获取FSM统计信息 */
     if (fsm_get_stats(light_fsm, &stats) == FSM_OK)
     {
         DEMO_LOG_INFO("FSM Statistics:");
@@ -441,6 +500,9 @@ void example_basic_usage(void)
     DEMO_LOG_INFO("Light FSM destroyed.");
 }
 
+/**
+ * @brief 高级功能示例（守卫、强制转移等）
+ */
 void example_advanced_features(void)
 {
     fsm_context_t fsm_context;
@@ -448,7 +510,7 @@ void example_advanced_features(void)
     {
         .blink_counter = 0,
         .brightness = 0,
-        .blink_interval = 100,  /* 快速闪烁 */
+        .blink_interval = 100,
         .manual_control = false,
         .description = "Advanced example"
     };
@@ -476,38 +538,30 @@ void example_advanced_features(void)
 
     DEMO_LOG_INFO("Advanced Light FSM created.");
 
-    /* 测试守卫条件：设置无效的闪烁间隔 */
     DEMO_LOG_INFO("Test 1: Testing guard condition (invalid blink interval)");
-    user_data.blink_interval = 0;  /* 无效的闪烁间隔 */
+    user_data.blink_interval = 0;
     fsm_process_event(light_fsm, EVENT_SET_BLINK, NULL);
     DEMO_PRINTF("Current state: %s (should still be OFF)\r\n",
                 fsm_get_state_name(light_fsm, fsm_get_current_state(light_fsm)));
 
-    /* 检查守卫拒绝计数 */
     if ((fsm_get_stats(light_fsm, &stats) == FSM_OK) && (stats.guard_rejections > 0))
     {
         DEMO_LOG_INFO("  Guard was rejected (expected)");
     }
 
-    /* 超时测试已移除 */
-
-    /* 测试强制状态 */
     DEMO_LOG_INFO("Test 2: Testing force state");
     fsm_force_state(light_fsm, LIGHT_ON);
     DEMO_PRINTF("Forced state to ON. Current state: %s\r\n",
                 fsm_get_state_name(light_fsm, fsm_get_current_state(light_fsm)));
 
-    /* 测试前一个状态 */
     DEMO_PRINTF("Previous state: %s\r\n",
                 fsm_get_state_name(light_fsm, fsm_get_previous_state(light_fsm)));
 
-    /* 测试状态检查 */
     DEMO_PRINTF("Is in ON state? %s\r\n",
                 fsm_is_in_state(light_fsm, LIGHT_ON) ? "Yes" : "No");
     DEMO_PRINTF("Is in OFF state? %s\r\n",
                 fsm_is_in_state(light_fsm, LIGHT_OFF) ? "Yes" : "No");
 
-    /* 测试二维数组访问 */
     DEMO_LOG_INFO("Test 3: Testing 2D array access");
     item = fsm_get_transition_item(&config, LIGHT_OFF, EVENT_TURN_ON);
     if ((item != NULL) && (item->next_state == LIGHT_ON))
@@ -525,8 +579,13 @@ void example_advanced_features(void)
     DEMO_LOG_INFO("Advanced Light FSM destroyed.");
 }
 
-int main(void)
+/*================================================================*/
+/* 主函数 */
+/*================================================================*/
+int main(int argc, const char* argv[])
 {
+    int ret = 0;
+
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
@@ -549,5 +608,5 @@ int main(void)
     getchar();
 #endif
 
-    return 0;
+    return ret;
 }
